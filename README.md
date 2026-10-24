@@ -1,2 +1,111 @@
-# pre-filtro-ia-docs-renda
-Pré-filtro que faz uma análise do documento de renda enviado e toma uma decisão entre aprovar ou não o documento.
+# AI pre-screening for proof-of-income documents
+
+**English** · [Português](README.pt-BR.md)
+
+A pre-screening tool that reads Brazilian pay stubs (*holerites*), extracts their data with an LLM and applies credit rules in code to approve, reject or route each case to human review.
+
+> **Personal AI product lab.** Not a production product. All data, rules and documents are fictional. Built to practice, end to end, what an AI PM needs to master: prompting, structured output, evals, guardrails, cost and latency.
+
+**Status:** work in progress. Rules, architecture and test set are defined; extraction and evals are under way.
+
+---
+
+## The problem
+
+In lending operations, every proof of income has to be checked before a contract is signed. When that check is 100% manual:
+
+- every document costs analyst time, including the ones that never had a chance (unreadable photo, wrong file, someone else's document);
+- the customer waits hours for an answer and, when rejected, often doesn't know what to fix;
+- the document step becomes a bottleneck between the intent to borrow and the signed contract.
+
+This project explores a product question: **how much of that check can be resolved automatically and safely, and where does a human remain essential?**
+
+## Why build it: the value proposition
+
+| Side | Value hypothesis | How to measure | Measurable in this lab? |
+|---|---|---|---|
+| **Operations** | Less analysis time and cost: cases that could never pass are resolved before they reach an analyst | % of cases resolved without a human; % of AI approvals reversed by the human reviewer | Partially (rates on the test set) |
+| **Customer experience** | An answer in seconds instead of hours, with the reason for rejection and what to fix | Latency per document; % of rejections with actionable guidance | Yes (latency and reasons) |
+| **Business** | A shorter contracting step and higher conversion to a signed contract | Duration of the document step; conversion to signed contract | No: requires real traffic; stays a hypothesis |
+
+The right-hand column is intentional: a lab proves whether the machine works, not its impact on conversion. That distinction defines what this project can and cannot claim.
+
+## How it works
+
+```mermaid
+flowchart TD
+    F["Front end (Streamlit)<br/>applicant data, income multiplier, documents"] --> OCR
+    E["Eval<br/>fictional test set"] --> OCR
+    subgraph N["Shared core"]
+        OCR["OCR (Tesseract)<br/>text + confidence"] --> X["Extraction (Gemini)<br/>JSON with classified line items"]
+        X <--> C[("Extraction cache")]
+        X --> V["JSON validation<br/>guardrails"]
+        V --> M["Rules engine<br/>computes and decides"]
+        CFG[("Config<br/>multiplier and tolerances")] --> M
+    end
+    M --> D["Approve → human review<br/>Reject → reason + guidance<br/>Suspected fraud → human review"]
+```
+
+**Core principle: the LLM reads, the code decides.** The model extracts and classifies every line item on the pay stub (e.g. "base salary: counts as income"; "overtime: doesn't count"). Every calculation and every decision lives in deterministic code. Why:
+
+- LLMs make arithmetic mistakes and shouldn't make credit decisions on their own;
+- the decision is auditable: you can explain exactly why a customer was rejected;
+- when something goes wrong, you can tell whether it was a reading error (the LLM) or a rule error (the code).
+
+Details in [`arquitetura.md`](arquitetura.md) and the full rule set in [`regras.md`](regras.md) (both in Portuguese).
+
+## Key product decisions
+
+Every decision, with its rationale and the alternatives discarded, is logged in [`decisoes.md`](decisoes.md). The most relevant:
+
+1. **Prompting + a rules engine instead of fine-tuning or RAG.** The rules are few, stable and fit in the prompt; fine-tuning would require a dataset labeled line by line and retraining for every rule change.
+2. **v1 covers pay stubs only.** Bank statements have an open problem (telling the income of someone who sells as an individual apart from a one-off transfer) and were moved to v2. Any other file is rejected with a single, actionable message: "we currently accept pay stubs only".
+3. **Humans review approvals, not rejections.** This focuses analysts where the credit risk is, but makes the **false negative** (rejecting someone who should pass) the critical error, because nobody reviews it. That's why automatic rejection only happens with high certainty.
+4. **Legibility measured by OCR confidence, not by the LLM's self-assessment.** A stable numeric signal can be calibrated; the model's opinion about its own reading can't.
+5. **Public demo without uploads.** The demo uses only fictional documents with cached extractions: zero cost, no risk of receiving real documents, and instant responses.
+
+## How I evaluate it
+
+The eval runs at two levels:
+
+- **Document:** did the LLM read it correctly? Accuracy per field (pay period, tax ID, amounts) and per classified line item.
+- **Applicant:** is the final decision right? Confusion matrix across approve, reject and human review.
+
+**Test set:** 32 fictional applicants (~100 pay stubs generated by code), with ~50% that should be approved and ~50% that shouldn't. The set is deliberately enriched: every path of every rule appears at least once, including edge cases (income at 2.98× and 3.02× the installment), overtime that would flip the decision, an unreadable document, a mismatched name and a pay stub containing a prompt injection. The expected decisions were labeled by hand. Scenarios in [`cenarios-base.md`](cenarios-base.md).
+
+**Why overall accuracy isn't enough:** in a set where 75% of applicants should be approved, a system that approves everyone scores 75%. Metrics are reported per class, with the false negative rate front and center.
+
+## Results
+
+> In progress. The numbers below will come from the evals run in this repository.
+
+| Metric | OCR + LLM | LLM reading the image |
+|---|---|---|
+| Accuracy per classified line item | — | — |
+| Accuracy of extracted amounts | — | — |
+| Final decision accuracy | — | — |
+| False negative rate | — | — |
+| Average latency per document | — | — |
+| Tokens per document | — | — |
+
+## Known limitations
+
+- Small, synthetic test set: the numbers show how the system behaves in the tested scenarios, not its performance on real documents.
+- Vacation pay issued before the pay period can inflate one month and deflate another; in v1, the pay period printed on the document prevails.
+- Pay stubs only in v1; bank statements, social security benefits, tax returns and owner's draw are mapped in [`regras.md`](regras.md) as backlog.
+
+## What I'd do differently
+
+> To be written at the end of the project.
+
+## Stack
+
+Python · Gemini API (free tier, Flash models) · Tesseract OCR · Streamlit · Claude Code
+
+## How to run
+
+> To be written once the code is ready.
+
+---
+
+**About me:** Suzane Lima, Product Manager with a background in fintech, credit and growth. [LinkedIn](https://www.linkedin.com/in/suzane-lima)

@@ -1,0 +1,33 @@
+cliente_id,nome,cpf,valor_parcela,data_analise
+A01,Otávio Oliveira Araújo,78294362239,600.00,2026-10-15
+A02,Carla Barros Magalhães,85369770433,822.00,2026-10-15
+A03,Wagner Cardoso Falcão,77864392695,426.00,2026-10-15
+A04,Henrique Magalhães Assunção,78131655008,470.00,2026-10-15
+A05,Felipe Teixeira Assunção,02982455153,703.00,2026-10-15
+A06,Sabrina Teixeira Freitas,69597035570,1007.00,2026-10-15
+A07,Eduarda Cardoso Rezende,26022802830,1024.00,2026-10-15
+A08,Marcos Conceição Rezende,75266065133,1484.00,2026-10-15
+A09,Eduarda Magalhães Barros,43816031099,1026.00,2026-10-15
+A10,Gabriela Quintana Pinto,81442028726,854.00,2026-10-15
+A11,Felipe Araújo Peixoto,37400604848,931.00,2026-10-15
+A12,Patrícia Duarte Pinto,77519454606,988.00,2026-10-15
+A13,Conceição Vieira Nogueira,92591263205,1112.00,2026-10-15
+A14,Marcos Oliveira Conceição,42550920287,589.00,2026-10-15
+A15,Antônio Medeiros Rezende,96636291770,1350.00,2026-10-15
+A16,Rafael Magalhães Vieira,89341349761,570.00,2026-10-15
+N01,Natália Moura Simões,69378389309,547.00,2026-10-15
+N02,Bruno Medeiros Rocha,22170093893,683.00,2026-10-15
+N03,Cláudio Falcão Nogueira,82527746365,814.00,2026-10-15
+N04,Conceição Campos Rezende,69670728541,744.00,2026-10-15
+N05,Inês Fontes Quintana,29764811132,402.00,2026-10-15
+N06,Inês Araújo Lima,61688980261,1048.00,2026-10-15
+N07,Fábio Campos Peixoto,38457031996,657.00,2026-10-15
+N08,Júlio Conceição Quintana,83701758484,794.00,2026-10-15
+N09,Rafael Rocha Peixoto,23139251297,583.00,2026-10-15
+N10,Wagner Simões Araújo,49744500697,1165.00,2026-10-15
+N11,Rogério Gonçalves Medeiros,97581560120,657.00,2026-10-15
+N12,Sérgio Medeiros Falcão,04436382923,859.00,2026-10-15
+N13,Wagner Barros Rezende,70648813657,1075.00,2026-10-15
+N14,Larissa Magalhães Pinto Cardoso,84915493580,427.00,2026-10-15
+N15,Henrique Moura Medeiros,81022785109,865.00,2026-10-15
+N16,Marcos Teixeira Nogueira,37848621014,1337.00,2026-10-15

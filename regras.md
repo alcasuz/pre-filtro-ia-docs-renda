@@ -1,7 +1,7 @@
 # Regras do pré-filtro (negócio fictício)
 
 > Laboratório pessoal. Regras e parâmetros inventados para fins de estudo; não representam a política de nenhuma empresa.
-> Versão: v1.0 (24/10/2026)
+> Versão: v1.1 (24/10/2026)
 
 ---
 
@@ -36,8 +36,8 @@ Saídas possíveis:
 Para cada regra, preencher **Quem faz**: `[LLM]` (ler/classificar) ou `[CÓDIGO]` (calcular/decidir). Uma regra pode ter as duas partes.
 
 ### R1. Tipo de documento
-- Não é documento de renda → **reprova** (motivo: arquivo não é comprovante de renda).
-- É documento de renda, mas de tipo não aceito na v1 → **reprova** (motivo: tipo não aceito).
+- Tipos que o LLM pode devolver: `holerite`, `holerite_ferias`, `holerite_13` ou `outro`.
+- `outro` (qualquer arquivo que não seja holerite: extrato, benefício do INSS, foto que não é documento etc.) → **reprova**. Mensagem ao usuário: "No momento aceitamos apenas holerite. Envie os holerites dos últimos 3 meses."
 - Print de tela ou sinais de edição → **revisão humana** (motivo: prevenção de fraude).
 - Quem faz: `[LLM]` define o tipo de documento e marca no JSON a sinalização de suspeita de fraude (print ou sinais de edição); `[CÓDIGO]` lê o tipo e a sinalização e decide entre aprovar, reprovar ou mandar para revisão humana.
 
@@ -52,7 +52,7 @@ Para cada regra, preencher **Quem faz**: `[LLM]` (ler/classificar) ou `[CÓDIGO]
 - Quem faz: `[LLM]` extrai o nome e o CPF como aparecem no documento; `[CÓDIGO]` normaliza o CPF (mantém só os 11 dígitos, qualquer que seja o formato: XXX.XXX.XXX-XX, XXXXXXXXXXX etc.), valida os dígitos verificadores, compara com o cadastro, calcula a similaridade do nome e decide.
 
 ### R3. Período
-- 3 holerites de competências mensais consecutivas, todos dentro dos 4 meses anteriores à `data_analise`.
+- 3 holerites de competências mensais consecutivas, todos dentro dos 4 meses anteriores ao mês da `data_analise`, sem incluir o próprio mês (ex.: `data_analise` = 2026-10-15 → valem as competências de 2026-06 a 2026-09).
 - Fora da janela ou menos de 3 holerites → **reprova**. Mensagem ao usuário: "Documentos fora do período aceito. Envie os holerites dos últimos 3 meses."
 - Se vierem mais de 3 holerites (ex.: 6 meses), só os 3 mais recentes entram no cálculo.
 - Se vierem dois holerites da mesma competência:
