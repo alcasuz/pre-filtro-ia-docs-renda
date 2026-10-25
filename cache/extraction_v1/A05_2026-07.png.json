@@ -1,0 +1,29 @@
+{
+  "file": "A05_2026-07.png",
+  "model": "gemini-3.8-flash",
+  "prompt_version": "extraction_v1",
+  "prompt_sha256": "75fb57f7abc1ebe0508af0fb55fa67091dfb9d243ca7f7a540c55bbd66a93cfa",
+  "extraction": {
+    "document_type": "payslip",
+    "pay_period": "2026-07",
+    "name_on_doc": "FELIPE TEIXEIRA ASSUNÇÃO",
+    "cpf_on_doc": "029.824.551-53",
+    "total_earnings": 3142.41,
+    "total_deductions": 307.13,
+    "net_pay": 2835.28,
+    "earnings_lines": [
+      {
+        "description": "SALÁRIO BASE",
+        "amount": 2776.85,
+        "counts_as_income": true
+      },
+      {
+        "description": "HORAS EXTRAS 50%",
+        "amount": 365.56,
+        "counts_as_income": false
+      }
+    ],
+    "fraud_suspected": false,
+    "fraud_reason": null
+  }
+}
