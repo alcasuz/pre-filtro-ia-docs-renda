@@ -1,7 +1,7 @@
 # Pre-screening rules (fictional business)
 
 > Personal lab. Rules and parameters invented for study purposes; they do not represent any company's policy.
-> Version: v1.1 (2026-10-24)
+> Version: v1.2 (2026-10-24)
 
 ## Glossary (Brazilian terms)
 
@@ -41,6 +41,10 @@ Possible outputs:
 - **Approved by the AI → goes to human review**, which confirms.
 - **Rejected → automatic rejection**, with the reason shown to the applicant.
 - **Direct human review**: suspected fraud or tampering.
+
+### Precedence when more than one rule fails
+- **Reject always takes precedence over suspected fraud.** If a case fails any reject rule and is also flagged for fraud, the decision is **reject**.
+- The fraud flag is always recorded alongside the decision, even when the case is rejected, so we can measure how many fraud attempts never reach human review.
 
 ---
 
