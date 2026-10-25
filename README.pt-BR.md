@@ -52,11 +52,11 @@ flowchart TD
 - a decisão fica auditável: dá para explicar exatamente por que um cliente foi reprovado;
 - quando algo dá errado, dá para saber se o erro foi de leitura (o LLM) ou de regra (o código).
 
-Detalhes em [`arquitetura.md`](arquitetura.md) e nas regras completas em [`regras.md`](regras.md).
+Detalhes em [`architecture.md`](architecture.md) e nas regras completas em [`rules.md`](rules.md) (documentação do repositório em inglês).
 
 ## Principais decisões de produto
 
-Todas as decisões, com motivo e alternativas descartadas, estão em [`decisoes.md`](decisoes.md). As mais relevantes:
+Todas as decisões, com motivo e alternativas descartadas, estão em [`decisions.md`](decisions.md). As mais relevantes:
 
 1. **Prompting + motor de regras, em vez de fine-tuning ou RAG.** As regras são poucas, fixas e cabem no prompt; fine-tuning exigiria base rotulada linha a linha e retreino a cada mudança de regra.
 2. **Escopo da v1 só com holerite.** Extrato bancário tem um problema aberto (distinguir a renda de quem vende como pessoa física de uma transferência pontual) e ficou para a v2. Qualquer outro arquivo é reprovado com uma mensagem única e acionável: "no momento aceitamos apenas holerite".
@@ -71,7 +71,7 @@ O eval roda em dois níveis:
 - **Documento:** o LLM leu certo? Acurácia por campo (competência, CPF, valores) e por linha classificada.
 - **Cliente:** a decisão final está certa? Matriz de confusão entre aprova, reprova e revisão humana.
 
-**Base de teste:** 32 clientes fictícios (~100 holerites gerados por código), com ~50% de casos que devem ser aprovados e ~50% que não. A base é enriquecida de propósito: cada caminho de cada regra aparece pelo menos uma vez, incluindo casos de borda (renda de 2,98× e 3,02× a parcela), hora extra que mudaria a decisão, documento ilegível, nome divergente e um holerite com prompt injection. O gabarito de decisão foi preenchido à mão. Cenários em [`cenarios-base.md`](cenarios-base.md).
+**Base de teste:** 32 clientes fictícios (~100 holerites gerados por código), com ~50% de casos que devem ser aprovados e ~50% que não. A base é enriquecida de propósito: cada caminho de cada regra aparece pelo menos uma vez, incluindo casos de borda (renda de 2,98× e 3,02× a parcela), hora extra que mudaria a decisão, documento ilegível, nome divergente e um holerite com prompt injection. O gabarito de decisão foi preenchido à mão. Cenários em [`test-scenarios.md`](test-scenarios.md).
 
 **Por que não usar só a acurácia geral:** numa base em que 75% dos clientes deveriam ser aprovados, um sistema que aprova todo mundo acerta 75%. As métricas são reportadas por classe, com o falso negativo em destaque.
 
@@ -92,7 +92,7 @@ O eval roda em dois níveis:
 
 - Base pequena e sintética: os números mostram o comportamento do sistema nos cenários testados, não a performance em documentos reais.
 - Férias pagas antes da competência podem inflar um mês e reduzir outro; na v1, vale a competência escrita no documento.
-- Só holerite na v1; extrato, benefício do INSS, IR e pró-labore estão mapeados em [`regras.md`](regras.md) como backlog.
+- Só holerite na v1; extrato, benefício do INSS, IR e pró-labore estão mapeados em [`rules.md`](rules.md) como backlog.
 
 ## O que eu faria diferente
 

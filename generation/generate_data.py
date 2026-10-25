@@ -1,13 +1,15 @@
 """Gera os dados da base de teste do pré-filtro (v1: holerite).
 
-Grava em dados/ os arquivos cadastros.csv, documentos.csv e rubricas.csv para os
-32 clientes de cenarios-base.md. Ao final, relê os CSVs gravados e confere se
-cada cliente atingiu o alvo do seu cenário, mostrando só "ok" ou "falhou".
+Grava em data/ os arquivos applicants.csv, documents.csv e line_items.csv para
+os 32 clientes de test-scenarios.md. Ao final, relê os CSVs gravados e confere
+se cada cliente atingiu o alvo do seu cenário, mostrando só "ok" ou "falhou".
 
 Todos os dados são fictícios. Valores em centavos inteiros e razões com
-Fraction, para que alvos como 3,00× a parcela sejam exatos.
+Fraction, para que alvos como 3,00× a parcela sejam exatos. Colunas e valores
+codificados ficam em inglês; o conteúdo dos documentos (nomes, empresas,
+descrições das rubricas) fica em português, como num holerite real.
 
-Uso: python3 geracao/gerar_dados.py
+Uso: python3 generation/generate_data.py
 """
 
 import csv
@@ -23,7 +25,7 @@ from pathlib import Path
 SEMENTE = 20261015
 DATA_ANALISE = "2026-10-15"
 MESES_PADRAO = ["2026-07", "2026-08", "2026-09"]
-PASTA_DADOS = Path(__file__).resolve().parent.parent / "dados"
+PASTA_DADOS = Path(__file__).resolve().parent.parent / "data"
 
 rng = random.Random(SEMENTE)
 
@@ -200,38 +202,38 @@ NOMES_EMPRESAS = [
 ]
 EMPRESA_VIGILANCIA = 5
 
-# tipo_real fica detalhado na base, mas a R1 (v1.1) só prevê quatro tipos de
-# saída do LLM. Para o eval, extrato e outro equivalem a "outro".
+# true_type fica detalhado na base, mas a R1 (v1.1) só prevê quatro tipos de
+# saída do LLM. Para o eval, bank_statement e other equivalem a "other".
 TIPO_NO_EVAL = {
-    "holerite": "holerite",
-    "holerite_ferias": "holerite_ferias",
-    "holerite_13": "holerite_13",
-    "extrato": "outro",
-    "outro": "outro",
+    "payslip": "payslip",
+    "payslip_vacation": "payslip_vacation",
+    "payslip_13th": "payslip_13th",
+    "bank_statement": "other",
+    "other": "other",
 }
 
-# chave: (código, descrição, tipo, conta_como_renda conforme a R5)
+# chave: (código, descrição, tipo, counts_as_income conforme a R5)
 RUBRICAS = {
-    "salario": ("0001", "SALÁRIO BASE", "vencimento", "sim"),
-    "noturno": ("0010", "ADICIONAL NOTURNO", "vencimento", "sim"),
-    "periculosidade": ("0011", "ADICIONAL DE PERICULOSIDADE 30%", "vencimento", "sim"),
-    "insalubridade": ("0012", "ADICIONAL DE INSALUBRIDADE", "vencimento", "sim"),
-    "gratificacao": ("0013", "GRATIFICAÇÃO DE FUNÇÃO", "vencimento", "sim"),
-    "anuenio": ("0014", "ANUÊNIO", "vencimento", "sim"),
-    "hora_extra": ("0020", "HORAS EXTRAS 50%", "vencimento", "nao"),
-    "comissao": ("0021", "COMISSÕES", "vencimento", "nao"),
-    "bonus": ("0022", "BÔNUS", "vencimento", "nao"),
-    "plr": ("0023", "PARTICIPAÇÃO NOS LUCROS (PLR)", "vencimento", "nao"),
-    "ferias": ("0030", "FÉRIAS", "vencimento", "sim"),
-    "terco_ferias": ("0031", "1/3 CONSTITUCIONAL DE FÉRIAS", "vencimento", "nao"),
-    "decimo_terceiro": ("0040", "13º SALÁRIO - 1ª PARCELA", "vencimento", "nao"),
-    "reembolso": ("0050", "REEMBOLSO DE DESPESAS", "vencimento", "nao"),
-    "diarias": ("0051", "DIÁRIAS DE VIAGEM", "vencimento", "nao"),
-    "ajuda_custo": ("0052", "AJUDA DE CUSTO", "vencimento", "nao"),
-    "inss": ("0501", "INSS", "desconto", "nao"),
-    "irrf": ("0502", "IRRF", "desconto", "nao"),
-    "adiantamento": ("0510", "ADIANTAMENTO SALARIAL", "desconto", "nao"),
-    "vale_transporte": ("0520", "VALE-TRANSPORTE 6%", "desconto", "nao"),
+    "salario": ("0001", "SALÁRIO BASE", "earning", "yes"),
+    "noturno": ("0010", "ADICIONAL NOTURNO", "earning", "yes"),
+    "periculosidade": ("0011", "ADICIONAL DE PERICULOSIDADE 30%", "earning", "yes"),
+    "insalubridade": ("0012", "ADICIONAL DE INSALUBRIDADE", "earning", "yes"),
+    "gratificacao": ("0013", "GRATIFICAÇÃO DE FUNÇÃO", "earning", "yes"),
+    "anuenio": ("0014", "ANUÊNIO", "earning", "yes"),
+    "hora_extra": ("0020", "HORAS EXTRAS 50%", "earning", "no"),
+    "comissao": ("0021", "COMISSÕES", "earning", "no"),
+    "bonus": ("0022", "BÔNUS", "earning", "no"),
+    "plr": ("0023", "PARTICIPAÇÃO NOS LUCROS (PLR)", "earning", "no"),
+    "ferias": ("0030", "FÉRIAS", "earning", "yes"),
+    "terco_ferias": ("0031", "1/3 CONSTITUCIONAL DE FÉRIAS", "earning", "no"),
+    "decimo_terceiro": ("0040", "13º SALÁRIO - 1ª PARCELA", "earning", "no"),
+    "reembolso": ("0050", "REEMBOLSO DE DESPESAS", "earning", "no"),
+    "diarias": ("0051", "DIÁRIAS DE VIAGEM", "earning", "no"),
+    "ajuda_custo": ("0052", "AJUDA DE CUSTO", "earning", "no"),
+    "inss": ("0501", "INSS", "deduction", "no"),
+    "irrf": ("0502", "IRRF", "deduction", "no"),
+    "adiantamento": ("0510", "ADIANTAMENTO SALARIAL", "deduction", "no"),
+    "vale_transporte": ("0520", "VALE-TRANSPORTE 6%", "deduction", "no"),
 }
 CHAVE_POR_CODIGO = {codigo: chave for chave, (codigo, *_) in RUBRICAS.items()}
 
@@ -285,22 +287,22 @@ def calcular_irrf(base):
 
 def documento(cli, arquivo, tipo, competencia=""):
     return {
-        "arquivo": arquivo,
-        "cliente_id": cli["id"],
-        "tipo_real": tipo,
-        "competencia": competencia,
-        "nome_no_doc": cli["nome_doc"],
-        "cpf_no_doc": cli["cpf_doc"],
-        "empresa": cli["empresa"][0],
-        "cnpj_empresa": mascara_cnpj(cli["empresa"][1]),
-        "degradacao": "nenhuma",
-        "texto_extra": "",
+        "file": arquivo,
+        "applicant_id": cli["id"],
+        "true_type": tipo,
+        "pay_period": competencia,
+        "name_on_doc": cli["nome_doc"],
+        "cpf_on_doc": cli["cpf_doc"],
+        "employer": cli["employer"][0],
+        "employer_cnpj": mascara_cnpj(cli["employer"][1]),
+        "degradation": "none",
+        "extra_text": "",
         "linhas": [],
         "ajuste_liquido": 0,
     }
 
 
-def holerite(cli, competencia, vencimentos, tipo="holerite", sufixo="",
+def holerite(cli, competencia, vencimentos, tipo="payslip", sufixo="",
              adiantamento=0, vale_transporte=False):
     """vencimentos: lista de (chave, valor) ou (chave, valor, descrição)."""
     doc = documento(cli, f"{cli['id']}_{competencia}{sufixo}.png", tipo, competencia)
@@ -308,7 +310,7 @@ def holerite(cli, competencia, vencimentos, tipo="holerite", sufixo="",
         if valor > 0:
             doc["linhas"].append((chave, valor, descricao[0] if descricao else None))
 
-    if tipo != "holerite_13":  # a 1ª parcela do 13º não tem descontos
+    if tipo != "payslip_13th":  # a 1ª parcela do 13º não tem descontos
         base = sum(v for k, v, _ in doc["linhas"] if k in INCIDENCIA)
         inss = calcular_inss(base)
         irrf = calcular_irrf(base - inss)
@@ -408,7 +410,7 @@ def holerites_com_ferias(cli, mult, dias_ferias, mes_ferias="2026-08"):
         docs.append(holerite(cli, competencia, [
             ("ferias", ferias, f"FÉRIAS ({dias_ferias} DIAS)"),
             ("terco_ferias", arredondar(Fraction(ferias, 3))),
-        ], tipo="holerite_ferias", sufixo="_ferias"))
+        ], tipo="payslip_vacation", sufixo="_ferias"))
     return docs
 
 
@@ -440,10 +442,10 @@ def criar_cliente(cid, empresas):
 
     cli = {
         "id": cid,
-        "nome": nome,
+        "name": nome,
         "cpf": cpf,
         "parcela": rng.randint(400, 1500) * 100,
-        "empresa": empresa,
+        "employer": empresa,
         "nome_doc": nome.upper(),
         "cpf_doc": mascara_cpf(cpf),
     }
@@ -498,7 +500,7 @@ def documentos_do_cliente(cli):
         docs = holerites_padrao(cli, folgado, vale_transporte=True)
         decimo = arredondar(Fraction(renda_alvo(cli, folgado), 2))
         docs.append(holerite(cli, "2026-09", [("decimo_terceiro", decimo)],
-                             tipo="holerite_13", sufixo="_13o"))
+                             tipo="payslip_13th", sufixo="_13o"))
         return docs
     if cid == "A12":
         # O líquido fica abaixo de 3×; só a renda bruta fixa passa
@@ -511,12 +513,12 @@ def documentos_do_cliente(cli):
         return holerites_padrao(cli, folgado, variaveis=("diarias",))
 
     if cid == "N01":
-        doc = documento(cli, "N01_conta_de_luz.png", "outro")
-        doc.update(nome_no_doc="", cpf_no_doc="", empresa="", cnpj_empresa="")
+        doc = documento(cli, "N01_conta_de_luz.png", "other")
+        doc.update(name_on_doc="", cpf_on_doc="", employer="", employer_cnpj="")
         return [doc]
     if cid == "N02":
-        doc = documento(cli, "N02_extrato_2026-09.png", "extrato", "2026-09")
-        doc.update(empresa="", cnpj_empresa="")
+        doc = documento(cli, "N02_extrato_2026-09.png", "bank_statement", "2026-09")
+        doc.update(employer="", employer_cnpj="")
         return [doc]
     if cid == "N03":
         return holerites_padrao(cli, folgado, variaveis=("plr",))
@@ -552,28 +554,28 @@ def aplicar_alteracoes(cid, docs):
     """Degradações, adulterações e textos que valem para documentos específicos."""
     if cid == "A16":
         for doc in docs:
-            doc["degradacao"] = "torta"
+            doc["degradation"] = "skewed"
     elif cid == "N12":
-        docs[1]["degradacao"] = "desfocada"
+        docs[1]["degradation"] = "blurred"
     elif cid == "N13":
-        docs[2]["degradacao"] = "print"
+        docs[2]["degradation"] = "screenshot"
     elif cid == "N15":
         docs[2]["ajuste_liquido"] = rng.randint(15000, 60000)
     elif cid == "N16":
-        docs[2]["texto_extra"] = TEXTO_INJECAO
+        docs[2]["extra_text"] = TEXTO_INJECAO
 
 
 # ---------------------------------------------------------------------------
 # Gravação
 # ---------------------------------------------------------------------------
 
-COLUNAS_CADASTROS = ["cliente_id", "nome", "cpf", "valor_parcela", "data_analise"]
+COLUNAS_CADASTROS = ["applicant_id", "name", "cpf", "installment_amount", "analysis_date"]
 COLUNAS_DOCUMENTOS = [
-    "arquivo", "cliente_id", "tipo_real", "competencia", "nome_no_doc",
-    "cpf_no_doc", "empresa", "cnpj_empresa", "total_vencimentos",
-    "total_descontos", "valor_liquido", "degradacao", "texto_extra",
+    "file", "applicant_id", "true_type", "pay_period", "name_on_doc",
+    "cpf_on_doc", "employer", "employer_cnpj", "total_earnings",
+    "total_deductions", "net_pay", "degradation", "extra_text",
 ]
-COLUNAS_RUBRICAS = ["arquivo", "codigo", "descricao", "tipo", "valor", "conta_como_renda"]
+COLUNAS_RUBRICAS = ["file", "code", "description", "kind", "amount", "counts_as_income"]
 
 
 def gravar(nome_arquivo, colunas, linhas):
@@ -593,38 +595,38 @@ def gerar():
         aplicar_alteracoes(cid, docs)
 
         cadastros.append({
-            "cliente_id": cid,
-            "nome": cli["nome"],
+            "applicant_id": cid,
+            "name": cli["name"],
             "cpf": cli["cpf"],
-            "valor_parcela": reais(cli["parcela"]),
-            "data_analise": DATA_ANALISE,
+            "installment_amount": reais(cli["parcela"]),
+            "analysis_date": DATA_ANALISE,
         })
         for doc in docs:
             linha_doc = {c: doc[c] for c in COLUNAS_DOCUMENTOS if c in doc}
-            if doc["tipo_real"].startswith("holerite"):
-                venc = sum(v for k, v, _ in doc["linhas"] if RUBRICAS[k][2] == "vencimento")
-                desc = sum(v for k, v, _ in doc["linhas"] if RUBRICAS[k][2] == "desconto")
+            if doc["true_type"].startswith("payslip"):
+                venc = sum(v for k, v, _ in doc["linhas"] if RUBRICAS[k][2] == "earning")
+                desc = sum(v for k, v, _ in doc["linhas"] if RUBRICAS[k][2] == "deduction")
                 linha_doc.update(
-                    total_vencimentos=reais(venc),
-                    total_descontos=reais(desc),
-                    valor_liquido=reais(venc - desc + doc["ajuste_liquido"]),
+                    total_earnings=reais(venc),
+                    total_deductions=reais(desc),
+                    net_pay=reais(venc - desc + doc["ajuste_liquido"]),
                 )
             documentos.append(linha_doc)
             for chave, valor, descricao in doc["linhas"]:
                 codigo, descricao_padrao, tipo, conta = RUBRICAS[chave]
                 rubricas.append({
-                    "arquivo": doc["arquivo"],
-                    "codigo": codigo,
-                    "descricao": descricao or descricao_padrao,
-                    "tipo": tipo,
-                    "valor": reais(valor),
-                    "conta_como_renda": conta,
+                    "file": doc["file"],
+                    "code": codigo,
+                    "description": descricao or descricao_padrao,
+                    "kind": tipo,
+                    "amount": reais(valor),
+                    "counts_as_income": conta,
                 })
 
     PASTA_DADOS.mkdir(exist_ok=True)
-    gravar("cadastros.csv", COLUNAS_CADASTROS, cadastros)
-    gravar("documentos.csv", COLUNAS_DOCUMENTOS, documentos)
-    gravar("rubricas.csv", COLUNAS_RUBRICAS, rubricas)
+    gravar("applicants.csv", COLUNAS_CADASTROS, cadastros)
+    gravar("documents.csv", COLUNAS_DOCUMENTOS, documentos)
+    gravar("line_items.csv", COLUNAS_RUBRICAS, rubricas)
     return len(cadastros), len(documentos), len(rubricas)
 
 
@@ -638,7 +640,7 @@ def ler(nome_arquivo):
 
 
 def janela(data):
-    """Competências aceitas (R3): os 4 meses anteriores ao mês da data_analise."""
+    """Competências aceitas (R3): os 4 meses anteriores ao mês da analysis_date."""
     ano, mes = int(data[:4]), int(data[5:7])
     meses = []
     for _ in range(4):
@@ -648,44 +650,44 @@ def janela(data):
 
 
 def verificar():
-    cadastros = {c["cliente_id"]: c for c in ler("cadastros.csv")}
-    documentos = ler("documentos.csv")
+    cadastros = {c["applicant_id"]: c for c in ler("applicants.csv")}
+    documentos = ler("documents.csv")
     linhas = defaultdict(list)
-    for r in ler("rubricas.csv"):
-        linhas[r["arquivo"]].append(dict(r, chave=CHAVE_POR_CODIGO[r["codigo"]], centavos=centavos(r["valor"])))
+    for r in ler("line_items.csv"):
+        linhas[r["file"]].append(dict(r, chave=CHAVE_POR_CODIGO[r["code"]], centavos=centavos(r["amount"])))
     docs_por_cliente = defaultdict(list)
     for d in documentos:
-        docs_por_cliente[d["cliente_id"]].append(d)
+        docs_por_cliente[d["applicant_id"]].append(d)
 
     def eh_holerite(d):
-        return d["tipo_real"].startswith("holerite")
+        return d["true_type"].startswith("payslip")
 
     def diferenca_liquido(d):
-        return centavos(d["total_vencimentos"]) - centavos(d["total_descontos"]) - centavos(d["valor_liquido"])
+        return centavos(d["total_earnings"]) - centavos(d["total_deductions"]) - centavos(d["net_pay"])
 
     def totais_batem(d):
-        ls = linhas[d["arquivo"]]
-        return (sum(l["centavos"] for l in ls if l["tipo"] == "vencimento") == centavos(d["total_vencimentos"])
-                and sum(l["centavos"] for l in ls if l["tipo"] == "desconto") == centavos(d["total_descontos"]))
+        ls = linhas[d["file"]]
+        return (sum(l["centavos"] for l in ls if l["kind"] == "earning") == centavos(d["total_earnings"])
+                and sum(l["centavos"] for l in ls if l["kind"] == "deduction") == centavos(d["total_deductions"]))
 
     def classificacao_r5(d):
-        return all(l["conta_como_renda"] == RUBRICAS[l["chave"]][3] for l in linhas[d["arquivo"]])
+        return all(l["counts_as_income"] == RUBRICAS[l["chave"]][3] for l in linhas[d["file"]])
 
     def soma(d, incluir):
-        return sum(l["centavos"] for l in linhas[d["arquivo"]] if l["tipo"] == "vencimento" and incluir(l))
+        return sum(l["centavos"] for l in linhas[d["file"]] if l["kind"] == "earning" and incluir(l))
 
-    def razao(cid, incluir=lambda l: l["conta_como_renda"] == "sim",
-              tipos=("holerite", "holerite_ferias"), n_meses=3):
+    def razao(cid, incluir=lambda l: l["counts_as_income"] == "yes",
+              tipos=("payslip", "payslip_vacation"), n_meses=3):
         """Média das verbas dos n meses mais recentes ÷ parcela."""
         por_mes = defaultdict(int)
         for d in docs_por_cliente[cid]:
-            if d["tipo_real"] in tipos:
-                por_mes[d["competencia"]] += soma(d, incluir)
+            if d["true_type"] in tipos:
+                por_mes[d["pay_period"]] += soma(d, incluir)
         meses = sorted(por_mes)[-n_meses:]
-        parcela = centavos(cadastros[cid]["valor_parcela"])
+        parcela = centavos(cadastros[cid]["installment_amount"])
         return Fraction(sum(por_mes[m] for m in meses), len(meses) * parcela)
 
-    conta_ou = lambda *chaves: (lambda l: l["conta_como_renda"] == "sim" or l["chave"] in chaves)
+    conta_ou = lambda *chaves: (lambda l: l["counts_as_income"] == "yes" or l["chave"] in chaves)
     FOLGA = Fraction(32, 10)
     meses_janela = set(janela(DATA_ANALISE))
 
@@ -693,59 +695,59 @@ def verificar():
         cad = cadastros[cid]
         docs = docs_por_cliente[cid]
         hol = [d for d in docs if eh_holerite(d)]
-        comps = sorted({d["competencia"] for d in hol})
+        comps = sorted({d["pay_period"] for d in hol})
         r = razao(cid) if hol else None
-        tem = lambda chave: any(l["chave"] == chave for d in hol for l in linhas[d["arquivo"]])
+        tem = lambda chave: any(l["chave"] == chave for d in hol for l in linhas[d["file"]])
         c = {
-            "cadastro": cpf_valido(cad["cpf"]) and cad["data_analise"] == DATA_ANALISE
-                        and centavos(cad["valor_parcela"]) > 0,
-            "formato_competencia": all(re.fullmatch(r"\d{4}-(0[1-9]|1[0-2])", d["competencia"])
-                                       for d in docs if d["competencia"]),
+            "cadastro": cpf_valido(cad["cpf"]) and cad["analysis_date"] == DATA_ANALISE
+                        and centavos(cad["installment_amount"]) > 0,
+            "formato_competencia": all(re.fullmatch(r"\d{4}-(0[1-9]|1[0-2])", d["pay_period"])
+                                       for d in docs if d["pay_period"]),
             "totais": all(totais_batem(d) for d in hol),
             "classificacao_r5": all(classificacao_r5(d) for d in hol),
             "conta_fecha": all(diferenca_liquido(d) == 0 for d in hol),
-            "cpf_no_doc": all(d["cpf_no_doc"] == mascara_cpf(cad["cpf"]) for d in hol),
-            "degradacao": all(d["degradacao"] == "nenhuma" for d in docs),
-            "texto_extra": all(d["texto_extra"] == "" for d in docs),
+            "cpf_on_doc": all(d["cpf_on_doc"] == mascara_cpf(cad["cpf"]) for d in hol),
+            "degradation": all(d["degradation"] == "none" for d in docs),
+            "extra_text": all(d["extra_text"] == "" for d in docs),
             "competencias": comps == MESES_PADRAO and set(comps) <= meses_janela,
             "renda": r is not None and r >= FOLGA,
         }
 
         if cid in ("A01", "A02", "A03"):
-            c["empresa"] = all(d["empresa"] == NOMES_EMPRESAS[int(cid[1:]) - 1] for d in hol)
+            c["employer"] = all(d["employer"] == NOMES_EMPRESAS[int(cid[1:]) - 1] for d in hol)
             c["so_salario"] = all(l["chave"] in ("salario", "inss", "irrf")
-                                  for d in hol for l in linhas[d["arquivo"]])
+                                  for d in hol for l in linhas[d["file"]])
         elif cid == "A04":
             c["adicional"] = tem("periculosidade") or tem("insalubridade")
         elif cid == "A05":
             c["hora_extra"] = tem("hora_extra")
         elif cid == "A06":
-            c["cpf_no_doc"] = all(re.fullmatch(r"\d{3}\.\d{3}\.\d{3}-\d{2}", d["cpf_no_doc"])
-                                  and so_digitos(d["cpf_no_doc"]) == cad["cpf"] for d in hol)
+            c["cpf_on_doc"] = all(re.fullmatch(r"\d{3}\.\d{3}\.\d{3}-\d{2}", d["cpf_on_doc"])
+                                  and so_digitos(d["cpf_on_doc"]) == cad["cpf"] for d in hol)
         elif cid == "A07":
-            c["cpf_no_doc"] = all(d["cpf_no_doc"] == cad["cpf"] for d in hol)
+            c["cpf_on_doc"] = all(d["cpf_on_doc"] == cad["cpf"] for d in hol)
         elif cid == "A08":
-            c["cpf_no_doc"] = all(d["cpf_no_doc"] == "" for d in hol)
-            c["nome"] = (cad["nome"] != sem_acento(cad["nome"])
-                         and all(d["nome_no_doc"] != cad["nome"]
-                                 and normalizar_nome(d["nome_no_doc"]) == normalizar_nome(cad["nome"])
+            c["cpf_on_doc"] = all(d["cpf_on_doc"] == "" for d in hol)
+            c["name"] = (cad["name"] != sem_acento(cad["name"])
+                         and all(d["name_on_doc"] != cad["name"]
+                                 and normalizar_nome(d["name_on_doc"]) == normalizar_nome(cad["name"])
                                  for d in hol))
         elif cid == "A09":
             c["competencias"] = (len(hol) == 6 and comps[-3:] == MESES_PADRAO
                                  and set(comps[-3:]) <= meses_janela)
             c["renda"] = r >= 3 and razao(cid, n_meses=6) < 3
         elif cid == "A10":
-            ferias = [d for d in hol if d["tipo_real"] == "holerite_ferias"]
-            c["ferias"] = (len(ferias) == 1 and ferias[0]["competencia"] in MESES_PADRAO
+            ferias = [d for d in hol if d["true_type"] == "payslip_vacation"]
+            c["ferias"] = (len(ferias) == 1 and ferias[0]["pay_period"] in MESES_PADRAO
                            and tem("terco_ferias"))
-            c["renda"] = r >= 3 and razao(cid, tipos=("holerite",)) < 3
+            c["renda"] = r >= 3 and razao(cid, tipos=("payslip",)) < 3
         elif cid == "A11":
-            decimo = [d for d in hol if d["tipo_real"] == "holerite_13"]
-            c["decimo"] = len(decimo) == 1 and decimo[0]["competencia"] in MESES_PADRAO
+            decimo = [d for d in hol if d["true_type"] == "payslip_13th"]
+            c["decimo"] = len(decimo) == 1 and decimo[0]["pay_period"] in MESES_PADRAO
         elif cid == "A12":
-            parcela = centavos(cad["valor_parcela"])
-            mensais = [d for d in hol if d["tipo_real"] == "holerite"]
-            liquido = Fraction(sum(centavos(d["valor_liquido"]) for d in mensais), len(mensais) * parcela)
+            parcela = centavos(cad["installment_amount"])
+            mensais = [d for d in hol if d["true_type"] == "payslip"]
+            liquido = Fraction(sum(centavos(d["net_pay"]) for d in mensais), len(mensais) * parcela)
             c["adiantamento"] = tem("adiantamento") and liquido < 3
         elif cid == "A13":
             c["renda"] = r == Fraction("3.02")
@@ -754,21 +756,21 @@ def verificar():
         elif cid == "A15":
             c["renda"] = r == 3
         elif cid == "A16":
-            c["degradacao"] = all(d["degradacao"] == "torta" for d in docs)
+            c["degradation"] = all(d["degradation"] == "skewed" for d in docs)
 
         elif cid in ("N01", "N02"):
-            tipo = "outro" if cid == "N01" else "extrato"
+            tipo = "other" if cid == "N01" else "bank_statement"
             c = {"cadastro": c["cadastro"], "formato_competencia": c["formato_competencia"],
-                 "tipo": len(docs) == 1 and docs[0]["tipo_real"] == tipo
-                         and not linhas[docs[0]["arquivo"]] and docs[0]["total_vencimentos"] == ""}
+                 "kind": len(docs) == 1 and docs[0]["true_type"] == tipo
+                         and not linhas[docs[0]["file"]] and docs[0]["total_earnings"] == ""}
         elif cid == "N03":
-            c["cpf_no_doc"] = all(cpf_valido(so_digitos(d["cpf_no_doc"]))
-                                  and so_digitos(d["cpf_no_doc"]) != cad["cpf"] for d in hol)
+            c["cpf_on_doc"] = all(cpf_valido(so_digitos(d["cpf_on_doc"]))
+                                  and so_digitos(d["cpf_on_doc"]) != cad["cpf"] for d in hol)
         elif cid == "N04":
-            c["cpf_no_doc"] = all(d["cpf_no_doc"] == "" and d["nome_no_doc"] == "" for d in hol)
+            c["cpf_on_doc"] = all(d["cpf_on_doc"] == "" and d["name_on_doc"] == "" for d in hol)
         elif cid in ("N05", "N14"):
             faixa = (lambda s: s < 0.5) if cid == "N05" else (lambda s: 0.5 <= s < 0.95)
-            c["cpf_no_doc"] = all(d["cpf_no_doc"] == "" and faixa(similaridade(d["nome_no_doc"], cad["nome"]))
+            c["cpf_on_doc"] = all(d["cpf_on_doc"] == "" and faixa(similaridade(d["name_on_doc"], cad["name"]))
                                   for d in hol)
         elif cid == "N06":
             c["competencias"] = len(comps) == 3 and not set(comps) & meses_janela
@@ -784,18 +786,18 @@ def verificar():
         elif cid == "N11":
             c["renda"] = r < 3 and razao(cid, incluir=conta_ou("terco_ferias")) >= 3
         elif cid == "N12":
-            c["degradacao"] = [d["degradacao"] for d in docs].count("desfocada") == 1 \
-                and all(d["degradacao"] in ("nenhuma", "desfocada") for d in docs)
+            c["degradation"] = [d["degradation"] for d in docs].count("blurred") == 1 \
+                and all(d["degradation"] in ("none", "blurred") for d in docs)
         elif cid == "N13":
-            c["degradacao"] = [d["degradacao"] for d in docs].count("print") == 1 \
-                and all(d["degradacao"] in ("nenhuma", "print") for d in docs)
+            c["degradation"] = [d["degradation"] for d in docs].count("screenshot") == 1 \
+                and all(d["degradation"] in ("none", "screenshot") for d in docs)
         elif cid == "N15":
             diferencas = [abs(diferenca_liquido(d)) for d in hol]
             c["conta_fecha"] = (sum(1 for x in diferencas if x > 10000) == 1
                                 and sum(1 for x in diferencas if x == 0) == len(hol) - 1)
         elif cid == "N16":
-            textos = [d["texto_extra"] for d in docs]
-            c["texto_extra"] = sum(1 for t in textos if t) == 1
+            textos = [d["extra_text"] for d in docs]
+            c["extra_text"] = sum(1 for t in textos if t) == 1
         return c
 
     print("Verificação por cliente:")
@@ -806,16 +808,16 @@ def verificar():
         print(f"  {cid}: " + ("ok" if not falhou else f"falhou ({', '.join(falhou)})"))
 
     cpfs = [c["cpf"] for c in cadastros.values()]
-    cnpjs = {so_digitos(d["cnpj_empresa"]) for d in documentos if d["cnpj_empresa"]}
+    cnpjs = {so_digitos(d["employer_cnpj"]) for d in documentos if d["employer_cnpj"]}
     globais = {
         "32 clientes, A01 a A16 e N01 a N16": sorted(cadastros) == sorted(IDS),
         "CPFs do cadastro válidos e únicos": all(map(cpf_valido, cpfs)) and len(set(cpfs)) == len(cpfs),
         "CNPJs válidos": bool(cnpjs) and all(map(cnpj_valido, cnpjs)),
-        "tipo_real mapeável para os tipos da R1": all(d["tipo_real"] in TIPO_NO_EVAL for d in documentos),
-        "nomes do cadastro únicos": len({c["nome"] for c in cadastros.values()}) == len(cadastros),
-        "arquivos únicos e com o ID do cliente": len({d["arquivo"] for d in documentos}) == len(documentos)
-            and all(d["arquivo"].startswith(d["cliente_id"] + "_") for d in documentos),
-        "toda rubrica pertence a um documento": set(linhas) <= {d["arquivo"] for d in documentos},
+        "true_type mapeável para os tipos da R1": all(d["true_type"] in TIPO_NO_EVAL for d in documentos),
+        "nomes do cadastro únicos": len({c["name"] for c in cadastros.values()}) == len(cadastros),
+        "arquivos únicos e com o ID do cliente": len({d["file"] for d in documentos}) == len(documentos)
+            and all(d["file"].startswith(d["applicant_id"] + "_") for d in documentos),
+        "toda rubrica pertence a um documento": set(linhas) <= {d["file"] for d in documentos},
     }
     print("Verificações gerais:")
     for nome, passou in globais.items():

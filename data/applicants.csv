@@ -1,4 +1,4 @@
-cliente_id,nome,cpf,valor_parcela,data_analise
+applicant_id,name,cpf,installment_amount,analysis_date
 A01,Otávio Oliveira Araújo,78294362239,600.00,2026-10-15
 A02,Carla Barros Magalhães,85369770433,822.00,2026-10-15
 A03,Wagner Cardoso Falcão,77864392695,426.00,2026-10-15
