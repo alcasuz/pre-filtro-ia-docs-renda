@@ -1,0 +1,18 @@
+{
+  "model": "gemini-3.8-flash",
+  "image": "data/images/A01_2026-07.png",
+  "prompt": "Classifique este documento e diga qual é a competência.",
+  "status": "completed",
+  "response": {
+    "document_type": "Recibo de Pagamento de Salário",
+    "pay_period": "Julho/2026"
+  },
+  "response_text": "{\n  \"document_type\": \"Recibo de Pagamento de Salário\",\n  \"pay_period\": \"Julho/2026\"\n}",
+  "input_tokens": 1093,
+  "output_tokens": 36,
+  "thought_tokens": 127,
+  "total_tokens": 1256,
+  "latency_s": 41.933,
+  "sdk_version": "2.33.0",
+  "executed_at": "2026-10-25T01:11:36+00:00"
+}
