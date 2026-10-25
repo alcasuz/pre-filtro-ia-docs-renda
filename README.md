@@ -6,7 +6,7 @@ A pre-screening tool that reads Brazilian pay stubs (*holerites*), extracts thei
 
 > **Personal AI product lab.** Not a production product. All data, rules and documents are fictional. Built to practice, end to end, what an AI PM needs to master: prompting, structured output, evals, guardrails, cost and latency.
 
-**Status:** work in progress. Rules, architecture and test set are defined; extraction and evals are under way.
+**Status:** work in progress. Rules, architecture and the test set (data and images) are done, and the Gemini smoke test has passed; extraction and evals are under way.
 
 ---
 
@@ -104,7 +104,27 @@ Python · Gemini API (free tier, Flash models) · Tesseract OCR · Streamlit · 
 
 ## How to run
 
-> To be written once the code is ready.
+> Partial: covers what exists today (test set generation and the Gemini smoke test). Extraction and evals will be added as they are built.
+
+**Requirements:** Python 3.15 (official installer from python.org) and, for the smoke test, a Gemini API key.
+
+```bash
+# 1. Create the virtual environment and install the pinned dependencies
+python3.15 -m venv .venv
+.venv/bin/pip install -r requirements.txt
+
+# 2. Gemini API key (only needed for calls to the API)
+cp .env.example .env    # then fill in GEMINI_API_KEY= in .env; it is git-ignored
+
+# 3. Regenerate the test set (no API calls; fixed seed, reproducible)
+.venv/bin/python generation/generate_data.py     # data/*.csv + an ok/failed check per applicant
+.venv/bin/python generation/generate_images.py   # data/images/*.png + data/images/_sample.png
+
+# 4. Gemini smoke test: one call, one image, no retries
+.venv/bin/python evaluation/smoke_test.py        # writes evaluation/smoke_test_result.json
+```
+
+The test set is already committed, so steps 3 and 4 are optional. The images use macOS system fonts; on another system they may differ slightly.
 
 ---
 

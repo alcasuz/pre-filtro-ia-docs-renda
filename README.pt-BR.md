@@ -6,7 +6,7 @@ Um pré-filtro que lê holerites, extrai os dados com um LLM e aplica regras de 
 
 > **Laboratório pessoal de produto de IA.** Não é um produto em produção. Todos os dados, regras e documentos são fictícios. Construído para praticar, de ponta a ponta, o que um PM de IA precisa dominar: prompts, structured output, evals, guardrails, custo e latência.
 
-**Status:** em construção. Regras, arquitetura e base de teste definidas; extração e evals em andamento.
+**Status:** em construção. Regras, arquitetura e base de teste (dados e imagens) prontas, e o smoke test do Gemini passou; extração e evals em andamento.
 
 ---
 
@@ -104,7 +104,27 @@ Python · Gemini API (plano gratuito, modelos Flash) · Tesseract OCR · Streaml
 
 ## Como rodar
 
-> A preencher quando o código estiver pronto.
+> Parcial: cobre o que existe hoje (geração da base de teste e smoke test do Gemini). Extração e evals entram conforme forem construídos.
+
+**Requisitos:** Python 3.15 (instalador oficial do python.org) e, para o smoke test, uma chave da API do Gemini.
+
+```bash
+# 1. Criar o ambiente virtual e instalar as dependências com versões fixas
+python3.15 -m venv .venv
+.venv/bin/pip install -r requirements.txt
+
+# 2. Chave da API do Gemini (só para chamadas à API)
+cp .env.example .env    # depois preencha GEMINI_API_KEY= no .env; ele é ignorado pelo git
+
+# 3. Regenerar a base de teste (sem chamar API; semente fixa, reproduzível)
+.venv/bin/python generation/generate_data.py     # data/*.csv + checagem ok/falhou por cliente
+.venv/bin/python generation/generate_images.py   # data/images/*.png + data/images/_sample.png
+
+# 4. Smoke test do Gemini: uma chamada, uma imagem, sem retentativas
+.venv/bin/python evaluation/smoke_test.py        # grava evaluation/smoke_test_result.json
+```
+
+A base de teste já está no repositório, então os passos 3 e 4 são opcionais. As imagens usam fontes do sistema do macOS; em outro sistema podem sair um pouco diferentes.
 
 ---
 
