@@ -62,7 +62,7 @@ Each rule states **Who does it**: `[LLM]` (read/classify), `[OCR]` or `[CODE]` (
 ### R2. Applicant identification
 - The document must show the name **or** the CPF. Neither → **reject**.
 - If it shows a CPF, it must match the applicant record. Different → **reject**. Same → applicant confirmed, and the name is not evaluated.
-- If there is no CPF, compare the name with the applicant record (after normalizing case, accents and spaces):
+- If there is no CPF, compare the name with the applicant record (after normalizing case, accents and spaces, and expanding the suffix "Jr"/"Jr." to "Junior"), using token-sort similarity (word order doesn't matter):
   - similarity ≥ 95% → ok;
   - similarity ≥ 50% and < 95% → **human review**;
   - similarity < 50% → **reject** (reason: name does not match the record).
