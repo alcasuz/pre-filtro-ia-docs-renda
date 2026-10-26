@@ -1,0 +1,24 @@
+{
+  "file": "A16_2026-07.png",
+  "model": "gemini-3.5-flash-lite",
+  "prompt_version": "extraction_v2",
+  "prompt_sha256": "7db901110926f9ca301af0d5f8a6690d07e244afd7355c3f5c108c7afc632b97",
+  "extraction": {
+    "document_type": "payslip",
+    "pay_period": "2026-07",
+    "name_on_doc": "RAFAEL MAGALHÃES VIEIRA",
+    "cpf_on_doc": "893.413.497-61",
+    "total_earnings": 2622.0,
+    "total_deductions": 213.21,
+    "net_pay": 2408.79,
+    "earnings_lines": [
+      {
+        "description": "SALÁRIO BASE",
+        "amount": 2622.0,
+        "counts_as_income": true
+      }
+    ],
+    "fraud_suspected": false,
+    "fraud_reason": null
+  }
+}

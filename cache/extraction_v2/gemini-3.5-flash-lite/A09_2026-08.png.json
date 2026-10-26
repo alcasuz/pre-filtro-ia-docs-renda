@@ -1,0 +1,24 @@
+{
+  "file": "A09_2026-08.png",
+  "model": "gemini-3.5-flash-lite",
+  "prompt_version": "extraction_v2",
+  "prompt_sha256": "7db901110926f9ca301af0d5f8a6690d07e244afd7355c3f5c108c7afc632b97",
+  "extraction": {
+    "document_type": "payslip",
+    "pay_period": "2026-08",
+    "name_on_doc": "EDUARDA MAGALHÃES BARROS",
+    "cpf_on_doc": "438.160.310-99",
+    "total_earnings": 3293.46,
+    "total_deductions": 345.19,
+    "net_pay": 2948.27,
+    "earnings_lines": [
+      {
+        "description": "SALÁRIO BASE",
+        "amount": 3293.46,
+        "counts_as_income": true
+      }
+    ],
+    "fraud_suspected": false,
+    "fraud_reason": null
+  }
+}

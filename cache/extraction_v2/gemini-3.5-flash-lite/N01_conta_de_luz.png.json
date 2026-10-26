@@ -1,0 +1,18 @@
+{
+  "file": "N01_conta_de_luz.png",
+  "model": "gemini-3.5-flash-lite",
+  "prompt_version": "extraction_v2",
+  "prompt_sha256": "7db901110926f9ca301af0d5f8a6690d07e244afd7355c3f5c108c7afc632b97",
+  "extraction": {
+    "document_type": "other",
+    "pay_period": null,
+    "name_on_doc": null,
+    "cpf_on_doc": null,
+    "total_earnings": null,
+    "total_deductions": null,
+    "net_pay": null,
+    "earnings_lines": [],
+    "fraud_suspected": false,
+    "fraud_reason": null
+  }
+}

@@ -45,6 +45,7 @@ Possible outputs:
 ### Precedence when more than one rule fails
 - **Reject always takes precedence over suspected fraud.** If a case fails any reject rule and is also flagged for fraud, the decision is **reject**.
 - The fraud flag is always recorded alongside the decision, even when the case is rejected, so we can measure how many fraud attempts never reach human review.
+- Legibility (R7, OCR confidence) is checked before document type (R1): an unreadable document is rejected with guidance to resend, never as 'type not accepted'.
 
 ---
 

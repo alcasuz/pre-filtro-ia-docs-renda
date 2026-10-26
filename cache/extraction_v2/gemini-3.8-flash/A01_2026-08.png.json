@@ -1,0 +1,24 @@
+{
+  "file": "A01_2026-08.png",
+  "model": "gemini-3.8-flash",
+  "prompt_version": "extraction_v2",
+  "prompt_sha256": "7db901110926f9ca301af0d5f8a6690d07e244afd7355c3f5c108c7afc632b97",
+  "extraction": {
+    "document_type": "payslip",
+    "pay_period": "2026-08",
+    "name_on_doc": "OTÁVIO OLIVEIRA ARAÚJO",
+    "cpf_on_doc": "782.943.622-39",
+    "total_earnings": 2388.0,
+    "total_deductions": 192.15,
+    "net_pay": 2195.85,
+    "earnings_lines": [
+      {
+        "description": "SALÁRIO BASE",
+        "amount": 2388.0,
+        "counts_as_income": true
+      }
+    ],
+    "fraud_suspected": false,
+    "fraud_reason": null
+  }
+}

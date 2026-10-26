@@ -1,0 +1,29 @@
+{
+  "file": "A04_2026-07.png",
+  "model": "gemini-3.8-flash",
+  "prompt_version": "extraction_v2",
+  "prompt_sha256": "7db901110926f9ca301af0d5f8a6690d07e244afd7355c3f5c108c7afc632b97",
+  "extraction": {
+    "document_type": "payslip",
+    "pay_period": "2026-07",
+    "name_on_doc": "HENRIQUE MAGALHÃES ASSUNÇÃO",
+    "cpf_on_doc": "781.316.550-08",
+    "total_earnings": 1607.4,
+    "total_deductions": 121.9,
+    "net_pay": 1485.5,
+    "earnings_lines": [
+      {
+        "description": "SALÁRIO BASE",
+        "amount": 1236.46,
+        "counts_as_income": true
+      },
+      {
+        "description": "ADICIONAL DE PERICULOSIDADE 30%",
+        "amount": 370.94,
+        "counts_as_income": true
+      }
+    ],
+    "fraud_suspected": false,
+    "fraud_reason": null
+  }
+}

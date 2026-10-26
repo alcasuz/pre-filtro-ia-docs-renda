@@ -1,18 +1,30 @@
 """Extração com o Gemini: uma imagem + o prompt de extração -> JSON estruturado.
 
-Para cada arquivo pedido, envia a imagem de data/images/ e o prompt de
-prompts/extraction_v1.txt ao modelo, com structured output no ESQUEMA abaixo,
-e salva a resposta em cache/extraction_v1/<file>.json. Se o arquivo já
-existir no cache, a API não é chamada. Cada chamada (com sucesso ou erro) é
-registrada em cache/extraction_v1/_log.csv com tokens e latência.
+Para cada arquivo, envia a imagem de data/images/ e o prompt de
+prompts/<versão>.txt ao modelo, com structured output no ESQUEMA abaixo, e
+salva a resposta em cache/<versão>/<modelo>/<file>.json. Se o arquivo já
+existir no cache, a API não é chamada; por isso, rodar de novo continua de onde
+parou. Cada chamada (com sucesso ou erro) é registrada em
+cache/<versão>/<modelo>/_log.csv com tokens e latência.
 
-Sem retentativas: um erro 429 (limite da cota) para a execução na hora. Outros
-erros da API também param a execução, porque tendem a se repetir nos
-documentos seguintes. A chave é lida do .env e nunca é impressa.
+Com --all, os documentos seguem uma ordem de prioridade: primeiro um documento
+por cliente, o mais informativo do cenário; depois os demais. Assim, uma cota
+diária pequena cobre o máximo de cenários.
 
-Uso: .venv/bin/python evaluation/extract.py A01_2026-07.png [outros arquivos...]
+Erros, sempre sem retentativa:
+- 429 (limite da cota): para a execução na hora;
+- 503 (modelo sobrecarregado), tempo limite (TEMPO_LIMITE_MS) ou queda de
+  conexão: registra no log e segue para o próximo documento, que fica fora do
+  cache e é tentado de novo na próxima execução;
+- qualquer outro erro: para a execução, porque tende a se repetir.
+A chave é lida do .env e nunca é impressa.
+
+Uso:
+  .venv/bin/python evaluation/extract.py --prompt extraction_v2 --model gemini-3.5-flash --all
+  .venv/bin/python evaluation/extract.py --prompt extraction_v1 A01_2026-07.png [...]
 """
 
+import argparse
 import base64
 import csv
 import hashlib
@@ -23,17 +35,18 @@ import time
 from datetime import datetime, timezone
 from pathlib import Path
 
+import httpx
 from dotenv import load_dotenv
 from google import genai
 from google.genai import types
 
 RAIZ = Path(__file__).resolve().parent.parent
 PASTA_IMAGENS = RAIZ / "data" / "images"
-VERSAO_PROMPT = "extraction_v1"
-ARQUIVO_PROMPT = RAIZ / "prompts" / f"{VERSAO_PROMPT}.txt"
-PASTA_CACHE = RAIZ / "cache" / VERSAO_PROMPT
-ARQUIVO_LOG = PASTA_CACHE / "_log.csv"
-MODELO = "gemini-3.8-flash"
+ARQUIVO_DOCUMENTOS = RAIZ / "data" / "documents.csv"
+MODELO_PADRAO = "gemini-3.8-flash"
+# Sem tempo limite, uma conexão que cai (ex.: o Mac entra em repouso) deixa a
+# chamada esperando para sempre. 300 s é mais que o dobro da maior latência vista.
+TEMPO_LIMITE_MS = 300_000
 
 TEXTO_OU_NULO = {"type": ["string", "null"]}
 NUMERO_OU_NULO = {"type": ["number", "null"]}
@@ -75,80 +88,158 @@ class Parar(Exception):
     """Erro que encerra a execução sem processar os arquivos seguintes."""
 
 
-def registrar(linha):
-    novo = not ARQUIVO_LOG.exists()
-    with open(ARQUIVO_LOG, "a", newline="", encoding="utf-8") as f:
-        escritor = csv.DictWriter(f, fieldnames=COLUNAS_LOG, lineterminator="\n")
-        if novo:
-            escritor.writeheader()
-        escritor.writerow(linha)
+class Pular(Exception):
+    """Erro que deixa este arquivo para a próxima execução e segue para o seguinte."""
 
 
-def extrair(cliente, chave, prompt, arquivo):
-    """Chama a API para um arquivo e grava o cache. Devolve 'cache' ou 'api'."""
-    destino = PASTA_CACHE / f"{arquivo}.json"
-    if destino.exists():
-        return "cache"
+class Extrator:
+    def __init__(self, cliente, chave, versao, modelo, intervalo_minimo=0.0):
+        self.cliente = cliente
+        self.chave = chave
+        self.versao = versao
+        self.modelo = modelo
+        self.intervalo_minimo = intervalo_minimo
+        self.ultima_chamada = None
+        self.prompt = (RAIZ / "prompts" / f"{versao}.txt").read_text(encoding="utf-8")
+        self.pasta_cache = RAIZ / "cache" / versao / modelo
+        self.arquivo_log = self.pasta_cache / "_log.csv"
+        self.pasta_cache.mkdir(parents=True, exist_ok=True)
 
-    imagem = PASTA_IMAGENS / arquivo
-    imagem_b64 = base64.b64encode(imagem.read_bytes()).decode("ascii")
-    linha_log = {"executed_at": datetime.now(timezone.utc).isoformat(timespec="seconds"),
-                 "file": arquivo, "model": MODELO, "prompt_version": VERSAO_PROMPT}
+    def registrar(self, linha):
+        novo = not self.arquivo_log.exists()
+        with open(self.arquivo_log, "a", newline="", encoding="utf-8") as f:
+            escritor = csv.DictWriter(f, fieldnames=COLUNAS_LOG, lineterminator="\n")
+            if novo:
+                escritor.writeheader()
+            escritor.writerow(linha)
 
-    inicio = time.perf_counter()
-    try:
-        interacao = cliente.interactions.create(
-            model=MODELO,
-            input=[
-                {"type": "text", "text": prompt},
-                {"type": "image", "data": imagem_b64, "mime_type": "image/png"},
-            ],
-            response_format={"type": "text", "mime_type": "application/json", "schema": ESQUEMA},
-            store=False,
-        )
-    except Exception as erro:
+    def extrair(self, arquivo):
+        """Chama a API para um arquivo e grava o cache. Devolve 'cache' ou 'api'."""
+        destino = self.pasta_cache / f"{arquivo}.json"
+        if destino.exists():
+            return "cache"
+
+        imagem_b64 = base64.b64encode((PASTA_IMAGENS / arquivo).read_bytes()).decode("ascii")
+        # Respeita o limite por minuto: o início de duas chamadas fica a pelo
+        # menos intervalo_minimo segundos de distância (leituras do cache não contam).
+        if self.ultima_chamada is not None:
+            espera = self.intervalo_minimo - (time.monotonic() - self.ultima_chamada)
+            if espera > 0:
+                time.sleep(espera)
+        self.ultima_chamada = time.monotonic()
+        linha_log = {"executed_at": datetime.now(timezone.utc).isoformat(timespec="seconds"),
+                     "file": arquivo, "model": self.modelo, "prompt_version": self.versao}
+
+        inicio = time.perf_counter()
+        try:
+            interacao = self.cliente.interactions.create(
+                model=self.modelo,
+                input=[
+                    {"type": "text", "text": self.prompt},
+                    {"type": "image", "data": imagem_b64, "mime_type": "image/png"},
+                ],
+                response_format={"type": "text", "mime_type": "application/json", "schema": ESQUEMA},
+                store=False,
+            )
+        except Exception as erro:
+            latencia = time.perf_counter() - inicio
+            # A Interactions API levanta erros com status_code (compat_errors); a API
+            # legada, google.genai.errors.APIError com code.
+            codigo = getattr(erro, "status_code", None) or getattr(erro, "code", None)
+            codigo = codigo if isinstance(codigo, int) else None
+            classes = {c.__name__ for c in type(erro).__mro__}
+            if "APITimeoutError" in classes or isinstance(erro, httpx.TimeoutException):
+                status = "error_timeout"
+            elif "APIConnectionError" in classes or isinstance(erro, httpx.TransportError):
+                status = "error_connection"
+            else:
+                status = f"error_{codigo or 'other'}"
+            mensagem = f"{type(erro).__module__}.{type(erro).__name__}: {erro}".replace(self.chave, "***")
+            self.registrar({**linha_log, "status": status,
+                            "latency_s": round(latencia, 3), "error": mensagem})
+            if codigo == 503 or status in ("error_timeout", "error_connection"):
+                motivo = {"error_timeout": "tempo limite", "error_connection": "falha de conexão"}.get(
+                    status, "modelo sobrecarregado (503)")
+                raise Pular(f"{arquivo}: {motivo} após {latencia:.2f} s; fica para a próxima execução.")
+            motivo = "limite de cota (429)" if codigo == 429 else "erro da API"
+            raise Parar(f"{arquivo}: {motivo} após {latencia:.2f} s, sem nova tentativa.\n{mensagem}")
         latencia = time.perf_counter() - inicio
-        # A Interactions API levanta erros com status_code (compat_errors); a API
-        # legada, google.genai.errors.APIError com code.
-        codigo = getattr(erro, "status_code", None) or getattr(erro, "code", None)
-        codigo = codigo if isinstance(codigo, int) else None
-        mensagem = f"{type(erro).__module__}.{type(erro).__name__}: {erro}".replace(chave, "***")
-        registrar({**linha_log, "status": f"error_{codigo or 'other'}",
-                   "latency_s": round(latencia, 3), "error": mensagem})
-        motivo = "limite de cota (429)" if codigo == 429 else "erro da API"
-        raise Parar(f"{arquivo}: {motivo} após {latencia:.2f} s, sem nova tentativa.\n{mensagem}")
-    latencia = time.perf_counter() - inicio
 
-    uso = interacao.usage
-    texto = interacao.output_text or ""
-    registrar({**linha_log, "status": "ok",
-               "input_tokens": uso.total_input_tokens if uso else "",
-               "output_tokens": uso.total_output_tokens if uso else "",
-               "thought_tokens": uso.total_thought_tokens if uso else "",
-               "total_tokens": uso.total_tokens if uso else "",
-               "latency_s": round(latencia, 3), "error": ""})
-    try:
-        extracao = json.loads(texto)
-    except json.JSONDecodeError:
-        raise Parar(f"{arquivo}: resposta não é JSON válido; nada foi gravado no cache.\n{texto}")
+        uso = interacao.usage
+        texto = interacao.output_text or ""
+        self.registrar({**linha_log, "status": "ok",
+                        "input_tokens": uso.total_input_tokens if uso else "",
+                        "output_tokens": uso.total_output_tokens if uso else "",
+                        "thought_tokens": uso.total_thought_tokens if uso else "",
+                        "total_tokens": uso.total_tokens if uso else "",
+                        "latency_s": round(latencia, 3), "error": ""})
+        try:
+            extracao = json.loads(texto)
+        except json.JSONDecodeError:
+            raise Parar(f"{arquivo}: resposta não é JSON válido; nada foi gravado no cache.\n{texto}")
 
-    registro = {
-        "file": arquivo,
-        "model": MODELO,
-        "prompt_version": VERSAO_PROMPT,
-        "prompt_sha256": hashlib.sha256(prompt.encode("utf-8")).hexdigest(),
-        "extraction": extracao,
-    }
-    destino.write_text(json.dumps(registro, ensure_ascii=False, indent=2) + "\n", encoding="utf-8")
-    return "api"
+        registro = {
+            "file": arquivo,
+            "model": self.modelo,
+            "prompt_version": self.versao,
+            "prompt_sha256": hashlib.sha256(self.prompt.encode("utf-8")).hexdigest(),
+            "extraction": extracao,
+        }
+        destino.write_text(json.dumps(registro, ensure_ascii=False, indent=2) + "\n", encoding="utf-8")
+        return "api"
 
 
-def main(arquivos):
-    if not arquivos:
-        sys.exit("Informe os arquivos de data/images/ a extrair.")
+def centavos(texto):
+    return round(float(texto) * 100) if texto else None
+
+
+def peso_informativo(doc):
+    """Quanto o documento diz sobre o cenário do cliente (maior = mais informativo)."""
+    peso = 0
+    if doc["degradation"] != "none" or doc["extra_text"]:
+        peso += 4
+    if doc["true_type"] != "payslip":
+        peso += 2
+    totais = [centavos(doc[c]) for c in ("total_earnings", "total_deductions", "net_pay")]
+    if None not in totais and totais[0] - totais[1] != totais[2]:
+        peso += 4  # conta que não fecha (N15)
+    return peso
+
+
+def ordem_de_prioridade(documentos):
+    """Um documento por cliente (o mais informativo) primeiro; depois os demais, na ordem do CSV."""
+    por_cliente = {}
+    for doc in documentos:
+        atual = por_cliente.get(doc["applicant_id"])
+        if atual is None or peso_informativo(doc) > peso_informativo(atual):
+            por_cliente[doc["applicant_id"]] = doc
+    primeiros = [d["file"] for d in por_cliente.values()]
+    return primeiros + [d["file"] for d in documentos if d["file"] not in primeiros]
+
+
+def main():
+    parser = argparse.ArgumentParser(description="Extrai documentos com o Gemini, com cache.")
+    parser.add_argument("--prompt", required=True, help="versão do prompt, ex.: extraction_v2")
+    parser.add_argument("--model", default=MODELO_PADRAO, help=f"modelo (padrão: {MODELO_PADRAO})")
+    parser.add_argument("--min-interval", type=float, default=0.0,
+                        help="segundos mínimos entre o início de duas chamadas (ex.: 4 = até 15 por minuto)")
+    parser.add_argument("--all", action="store_true",
+                        help="todos os arquivos de data/documents.csv, em ordem de prioridade")
+    parser.add_argument("arquivos", nargs="*", help="arquivos de data/images/")
+    args = parser.parse_args()
+
+    if args.all == bool(args.arquivos):
+        sys.exit("Informe --all ou uma lista de arquivos (não os dois).")
+    if args.all:
+        with open(ARQUIVO_DOCUMENTOS, newline="", encoding="utf-8") as f:
+            arquivos = ordem_de_prioridade(list(csv.DictReader(f)))
+    else:
+        arquivos = args.arquivos
     faltando = [a for a in arquivos if not (PASTA_IMAGENS / a).exists()]
     if faltando:
         sys.exit(f"Arquivos não encontrados em data/images/: {', '.join(faltando)}")
+    if not (RAIZ / "prompts" / f"{args.prompt}.txt").exists():
+        sys.exit(f"Prompt não encontrado: prompts/{args.prompt}.txt")
 
     load_dotenv(RAIZ / ".env")
     chave = os.environ.get("GEMINI_API_KEY", "").strip()
@@ -158,19 +249,32 @@ def main(arquivos):
     # permitiria uma segunda chamada).
     cliente = genai.Client(
         api_key=chave,
-        http_options=types.HttpOptions(retry_options=types.HttpRetryOptions(attempts=0)),
+        http_options=types.HttpOptions(timeout=TEMPO_LIMITE_MS,
+                                       retry_options=types.HttpRetryOptions(attempts=0)),
     )
-    prompt = ARQUIVO_PROMPT.read_text(encoding="utf-8")
-    PASTA_CACHE.mkdir(parents=True, exist_ok=True)
+    extrator = Extrator(cliente, chave, args.prompt, args.model, args.min_interval)
+    print(f"Modelo: {args.model} | prompt: {args.prompt} | intervalo mínimo: {args.min_interval:g} s | "
+          f"cache: {extrator.pasta_cache.relative_to(RAIZ)}", flush=True)
 
-    for arquivo in arquivos:
+    contagem = {"api": 0, "cache": 0, "pulados": 0}
+    for i, arquivo in enumerate(arquivos, 1):
         try:
-            origem = extrair(cliente, chave, prompt, arquivo)
+            origem = extrator.extrair(arquivo)
+        except Pular as pulo:
+            contagem["pulados"] += 1
+            print(f"[{i}/{len(arquivos)}] PULADO: {pulo}", flush=True)
+            continue
         except Parar as parada:
-            print(f"PARADO: {parada}", file=sys.stderr)
+            print(f"[{i}/{len(arquivos)}] PARADO: {parada}", file=sys.stderr, flush=True)
+            print(f"Resumo até aqui: {contagem}", flush=True)
             sys.exit(1)
-        print(f"{arquivo}: {'do cache, sem chamar a API' if origem == 'cache' else 'extraído pela API'}")
+        contagem[origem] += 1
+        if origem == "api":
+            print(f"[{i}/{len(arquivos)}] {arquivo}: extraído pela API", flush=True)
+    print(f"Fim: {contagem['api']} extraídos pela API, {contagem['cache']} já no cache, "
+          f"{contagem['pulados']} pulados por 503, tempo limite ou conexão "
+          "(rode de novo para tentá-los).", flush=True)
 
 
 if __name__ == "__main__":
-    main(sys.argv[1:])
+    main()

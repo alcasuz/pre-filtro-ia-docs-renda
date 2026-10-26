@@ -1,0 +1,24 @@
+{
+  "file": "N08_2026-08.png",
+  "model": "gemini-3.5-flash-lite",
+  "prompt_version": "extraction_v2",
+  "prompt_sha256": "7db901110926f9ca301af0d5f8a6690d07e244afd7355c3f5c108c7afc632b97",
+  "extraction": {
+    "document_type": "payslip",
+    "pay_period": "2026-08",
+    "name_on_doc": "JÚLIO CONCEIÇÃO QUINTANA",
+    "cpf_on_doc": "837.017.584-84",
+    "total_earnings": 1516.54,
+    "total_deductions": 113.74,
+    "net_pay": 1402.8,
+    "earnings_lines": [
+      {
+        "description": "SALÁRIO BASE",
+        "amount": 1516.54,
+        "counts_as_income": true
+      }
+    ],
+    "fraud_suspected": false,
+    "fraud_reason": null
+  }
+}
