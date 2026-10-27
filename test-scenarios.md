@@ -82,4 +82,4 @@ For the eval, `bank_statement` and `other` are both scored as `other`, the LLM's
 ### `ground_truth.csv` (one per applicant; filled in by hand, without AI)
 `applicant_id, scenario, rule_tested, installment_amount, expected_valid_income, expected_decision (approve / reject / review), expected_reason, notes`
 
-Reason codes: `type_not_accepted`, `id_missing`, `cpf_mismatch`, `name_mismatch`, `name_review`, `outside_window`, `non_consecutive_months`, `insufficient_income`, `illegible`, `suspected_fraud`. Approved applicants have an empty reason.
+Reason codes: `type_not_accepted`, `id_missing`, `cpf_mismatch`, `name_mismatch`, `name_review`, `outside_window`, `non_consecutive_months`, `insufficient_income`, `illegible`, `too_many_attempts`, `suspected_fraud`. Approved applicants have an empty reason. `too_many_attempts` (a legibility failure after 2 earlier legibility rejections in the same request, R7) needs the request's history, which the v1 test set doesn't have: the eval runs every applicant with `prior_legibility_failures = 0`, so this path is covered by the unit tests only.

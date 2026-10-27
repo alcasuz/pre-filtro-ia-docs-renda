@@ -7,3 +7,11 @@ name_review: 0.50             # R2: 0.50 <= similaridade < 0.95 vai para revisã
 window_months: 4              # R3: meses anteriores ao mês da analysis_date
 required_months: 3            # R3: holerites de meses consecutivos exigidos
 name_similarity: token_sort_ratio  # R2: fórmula de similaridade (core/rules/name_similarity.py)
+# R7: confiança média do OCR (Tesseract 5.5.3, modelo por, --psm 3) abaixo deste valor = ilegível.
+# PROVISÓRIO: calibrado na base sintética (pior holerite legível: 62,91, um A16 torto;
+# N12 desfocado: 0,00). Recalibrar com fotos reais (base v2) e ao trocar versão ou modelo.
+legibility_min_confidence: 30
+# R7: na tentativa de número max_legibility_attempts do pedido (ou seja, depois de
+# max_legibility_attempts - 1 reprovações por ilegibilidade, informadas por quem chama
+# o motor), uma nova falha de legibilidade vai para revisão humana (too_many_attempts).
+max_legibility_attempts: 3

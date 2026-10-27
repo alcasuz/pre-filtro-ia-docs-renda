@@ -1,5 +1,6 @@
 google-genai==2.33.0
 Pillow==13.0.0
+pytesseract==0.3.13
 pytest==9.1.1
 python-dotenv==1.2.4
 PyYAML==6.0.3

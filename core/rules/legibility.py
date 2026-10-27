@@ -1,24 +1,32 @@
 """R7 (legibilidade): documento ilegível reprova, com orientação para reenviar.
 
-O sinal definitivo virá do OCR (Documento.legible). Enquanto ele não existe, vale
-o critério provisório: tipo other com todos os campos nulos e nenhuma linha é
-tratado como ilegível, porque é o que o LLM devolve para uma imagem desfocada.
+O sinal é a confiança média das palavras no OCR (core/ocr.py): abaixo de
+legibility_min_confidence, o documento é ilegível; no limite exato, é legível.
+Sem confiança de OCR (o OCR não conseguiu ler) também é falha de legibilidade.
+
+Fallback, no nível do pedido: falhas_anteriores é quantas reprovações por
+ilegibilidade o pedido já teve (informado por quem chama o motor). Se esta é a
+tentativa max_legibility_attempts ou além, a falha vai para revisão humana
+(too_many_attempts) em vez de reprovar de novo, para quem não consegue gerar uma
+imagem legível não ficar preso.
 """
 
-from ..models import PASS, REJECT, ResultadoRegra
-
-CAMPOS = ("pay_period", "name_on_doc", "cpf_on_doc", "total_earnings", "total_deductions", "net_pay")
+from ..models import PASS, REJECT, REVIEW, ResultadoRegra
 
 
-def avaliar(doc):
-    if doc.legible is not None:
-        legivel, criterio = doc.legible, "ocr"
+def avaliar(doc, config, falhas_anteriores=0):
+    tentativa = falhas_anteriores + 1
+    detalhes = {"ocr_confidence": doc.ocr_confidence, "min_confidence": config.legibility_min_confidence,
+                "prior_legibility_failures": falhas_anteriores, "max_attempts": config.max_legibility_attempts}
+    if doc.ocr_confidence is None:
+        legivel, detalhes["criterion"] = False, "ocr_unavailable"
     else:
-        vazio = all(getattr(doc, c) is None for c in CAMPOS) and not doc.earnings_lines
-        legivel, criterio = not (doc.document_type == "other" and vazio), "provisorio_other_nulo"
-    return ResultadoRegra(
-        rule="legibility", file=doc.file,
-        status=PASS if legivel else REJECT,
-        reason=None if legivel else "illegible",
-        details={"legible": legivel, "criterion": criterio},
-    )
+        legivel, detalhes["criterion"] = doc.ocr_confidence >= config.legibility_min_confidence, "ocr_confidence"
+
+    if legivel:
+        status, motivo = PASS, None
+    elif tentativa >= config.max_legibility_attempts:
+        status, motivo = REVIEW, "too_many_attempts"
+    else:
+        status, motivo = REJECT, "illegible"
+    return ResultadoRegra(rule="legibility", file=doc.file, status=status, reason=motivo, details=detalhes)

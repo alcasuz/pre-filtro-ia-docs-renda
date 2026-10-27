@@ -10,6 +10,7 @@ CPF = "78294362239"  # CPF fictício com dígitos verificadores válidos
 
 CONFIG = ConfigRegras(version=1, income_multiplier=Decimal("3"), consistency_tolerance=Decimal("100"),
                       name_ok=0.95, name_review=0.50, window_months=4, required_months=3,
+                      legibility_min_confidence=30.0, max_legibility_attempts=3,
                       name_similarity="token_sort_ratio")
 
 
@@ -23,7 +24,7 @@ def cliente(nome="Otávio Oliveira Araújo", cpf=CPF, parcela="1000.00", analise
 
 def holerite(periodo="2026-09", salario="3000.00", tipo="payslip", arquivo=None, linhas=None,
              nome="OTÁVIO OLIVEIRA ARAÚJO", cpf="782.943.622-39", totais=("3000.00", "250.00", "2750.00"),
-             fraude=False, motivo_fraude=None, legivel=None):
+             fraude=False, motivo_fraude=None, ocr=88.0):
     if linhas is None:
         linhas = [Linha("SALÁRIO BASE", d(salario), True)]
     return Documento(
@@ -32,15 +33,15 @@ def holerite(periodo="2026-09", salario="3000.00", tipo="payslip", arquivo=None,
         total_earnings=None if totais[0] is None else d(totais[0]),
         total_deductions=None if totais[1] is None else d(totais[1]),
         net_pay=None if totais[2] is None else d(totais[2]),
-        earnings_lines=linhas, fraud_suspected=fraude, fraud_reason=motivo_fraude, legible=legivel,
+        earnings_lines=linhas, fraud_suspected=fraude, fraud_reason=motivo_fraude, ocr_confidence=ocr,
     )
 
 
-def documento_vazio(tipo="other", arquivo="T01_borrado.png"):
+def documento_vazio(tipo="other", arquivo="T01_borrado.png", ocr=0.0):
     """O que o LLM devolve para uma imagem desfocada: tipo other e tudo nulo."""
     return Documento(file=arquivo, document_type=tipo, pay_period=None, name_on_doc=None,
                      cpf_on_doc=None, total_earnings=None, total_deductions=None, net_pay=None,
-                     earnings_lines=[], fraud_suspected=False)
+                     earnings_lines=[], fraud_suspected=False, ocr_confidence=ocr)
 
 
 def tres_meses(salario="3000.00", meses=("2026-07", "2026-08", "2026-09"), **kwargs):

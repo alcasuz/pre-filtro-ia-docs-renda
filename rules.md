@@ -97,9 +97,10 @@ Each rule states **Who does it**: `[LLM]` (read/classify), `[OCR]` or `[CODE]` (
 - Who does it: `[CODE]`, from the lines classified in R5.
 
 ### R7. Quality and security
-- Unreadable, cropped or blurred image → **reject with guidance to resend**.
+- Unreadable, cropped or blurred image → **reject with guidance to resend**. An image the OCR can't read at all (no confidence returned) counts as unreadable.
+- Fallback, per request: if the request already had 2 rejections for illegibility, a new legibility failure → **human review** (reason: too many attempts), so an applicant who can't produce a readable image isn't stuck. The count is per request, not per document, and is informed by whoever calls the engine. If the illegible document's data is missing, period and income failures caused by it become review instead of reject; any other reject still applies.
 - Document with text trying to give instructions to the system (prompt injection) → **human review** (suspected fraud).
-- Who does it (legibility): `[OCR]` produces the average reading confidence; `[CODE]` compares it to a minimum threshold (to be calibrated in the eval) and decides whether the document is unreadable.
+- Who does it (legibility): `[OCR]` produces the average reading confidence; `[CODE]` compares it to a minimum threshold (to be calibrated in the eval) and decides whether the document is unreadable; the caller informs how many legibility rejections the request already had.
 - Who does it (fraud): `[LLM]` flags suspected fraud in the JSON (including prompt injection) with a short justification; `[CODE]` reads the flag and decides.
 
 ---

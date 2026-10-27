@@ -1,6 +1,6 @@
 # Avaliação por cliente: oracle (gabarito)
 
-Gerado por `evaluation/score_applicants.py`, sem chamadas à API. Configuração: `config/default_rules.yaml` v1 (multiplicador 3, similaridade token_sort_ratio).
+Gerado por `evaluation/score_applicants.py`, sem chamadas à API. Configuração: `config/default_rules.yaml` v1 (multiplicador 3, similaridade token_sort_ratio, legibilidade OCR >= 30).
 
 ## Resumo
 

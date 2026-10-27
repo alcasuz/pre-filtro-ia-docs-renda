@@ -8,11 +8,22 @@ qualquer review vence approve. O motivo principal é o primeiro reject na ordem
 das regras ou, sem reject, o primeiro review.
 
 Quais documentos cada regra recebe:
-- legibilidade e fraude: todos os documentos (a fraude, só os legíveis);
+- legibilidade: todos os documentos, pela confiança do OCR (Documento.ocr_confidence);
+- fraude: os legíveis;
 - tipo: os legíveis; um documento de outro tipo junto com holerites é ignorado;
 - titular e consistência: os holerites legíveis;
 - período e renda: todos os holerites, inclusive um ilegível cujos dados existam
   (modo oracle). Sem nenhum holerite, período e renda não são avaliados.
+
+Contrato de entrada: o motor não guarda estado. Quem chama informa a
+analysis_date (em Cliente) e prior_legibility_failures, quantas reprovações por
+ilegibilidade o pedido já teve (padrão 0).
+
+Documento escalado por tentativas (too_many_attempts): os dados dele faltam no
+período e na renda, que reprovariam o cliente por isso e anulariam o fallback
+(reject vence review). Então, quando há um documento escalado, uma reprovação de
+período ou renda vira revisão, com o motivo original mantido na lista. As outras
+reprovações (tipo, titular) continuam valendo.
 """
 
 from .models import APPROVE, PASS, REJECT, REVIEW, Decisao
@@ -22,9 +33,10 @@ ORDEM_REGRAS = ["legibility", "document_type", "identification", "time_window", 
                 "consistency", "fraud"]
 
 
-def decidir(cliente, documentos, config):
-    resultados = [legibility.avaliar(d) for d in documentos]
+def decidir(cliente, documentos, config, prior_legibility_failures=0):
+    resultados = [legibility.avaliar(d, config, prior_legibility_failures) for d in documentos]
     ilegiveis = {r.file for r in resultados if r.status != PASS}
+    escalados = [r.file for r in resultados if r.reason == "too_many_attempts"]
     legiveis = [d for d in documentos if d.file not in ilegiveis]
 
     resultados.append(document_type.avaliar(legiveis))
@@ -39,6 +51,10 @@ def decidir(cliente, documentos, config):
         meses_usados = periodo.details["months_used"]
         renda = income.avaliar(holerites, meses_usados, cliente, config)
         renda_valida = renda.details["valid_income"]
+        for r in (periodo, renda):
+            if escalados and r.status == REJECT:
+                r.status = REVIEW
+                r.details["incomplete_due_to"] = escalados
         resultados += [periodo, renda]
 
     resultados += [consistency.avaliar(d, config) for d in holerites_legiveis]

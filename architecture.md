@@ -27,6 +27,19 @@ Only the extraction step calls the Gemini API and uses quota. Everything else is
 3. **Extraction cache.** Each document's JSON is stored per document and prompt version. Changing a rule reruns only the engine, without new API calls.
 4. **Independent rules.** Each rule receives the JSON and the applicant record and returns: pass, fail or review, plus the reason.
 
+## Rules engine input contract
+
+The engine (`core/engine.py`) is a pure function: it keeps no state between calls, so the same input always produces the same decision. Everything that depends on time or on the request's history comes from the caller:
+
+| Input | Who provides it | Front end | Eval |
+|---|---|---|---|
+| Applicant record, including `analysis_date` | caller (`Cliente`) | today's date | fixed date from `applicants.csv` |
+| Documents (extraction + OCR confidence) | caller (`Documento` list) | extraction and OCR of the uploaded files | cached extraction (or the ground truth, in oracle mode) + `cache/ocr/confidence.csv` |
+| `prior_legibility_failures` | caller (request history) | number of rejections for illegibility this request already had | always 0 (the test set has no history) |
+| Rule parameters | `config/default_rules.yaml` | default file, multiplier editable | default file, version recorded in each report |
+
+The front end owns the request history (e.g., how many times it was rejected for illegibility) and passes it on every call; the engine never stores it. Requests are not tracked by file hash.
+
 ## Risks and design decisions
 
 - **Eval comparability:** results are valid only for the configuration they were measured with. Each eval run records the configuration version.

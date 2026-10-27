@@ -1,16 +1,16 @@
 # Avaliação por cliente: cache extraction_v2 · gemini-3.5-flash-lite
 
-Gerado por `evaluation/score_applicants.py`, sem chamadas à API. Configuração: `config/default_rules.yaml` v1 (multiplicador 3, similaridade token_sort_ratio).
+Gerado por `evaluation/score_applicants.py`, sem chamadas à API. Configuração: `config/default_rules.yaml` v1 (multiplicador 3, similaridade token_sort_ratio, legibilidade OCR >= 30).
 
 ## Resumo
 
 ```
 Fonte: cache extraction_v2 · gemini-3.5-flash-lite | config v1 | clientes: 32
-Decisão certa: 32/32 (100.0%) | motivo principal certo: 31/32 (96.9%)
+Decisão certa: 32/32 (100.0%) | motivo principal certo: 32/32 (100.0%)
 Acerto por classe: approve 16/16 (100.0%) | reject 12/12 (100.0%) | review 4/4 (100.0%)
 Falso negativo (deveria aprovar, foi reprovado): 0/16 (0.0%)
 Renda válida diferente do gabarito (> R$ 0,01): 0 de 30 comparáveis
-Clientes com decisão ou motivo errado: 1 (N01)
+Clientes com decisão ou motivo errado: 0
 ```
 
 ## Matriz de confusão
@@ -25,9 +25,7 @@ Linhas: gabarito. Colunas: motor.
 
 ## Clientes errados (decisão ou motivo principal)
 
-| Cliente | Cenário | Esperado | Obtido | Motivo esperado | Motivo obtido | Todos os motivos |
-|---|---|---|---|---|---|---|
-| N01 | File that is not an income document | reject | reject | type_not_accepted | illegible | illegible |
+Nenhum.
 
 ## Renda válida
 
@@ -53,7 +51,7 @@ Comparáveis: 30; diferentes do gabarito (> R$ 0,01): 0.
 | A14 | approve | approve | — | — | 1796.45 | 1796.45 | não |
 | A15 | approve | approve | — | — | 4050.00 | 4050.00 | não |
 | A16 | approve | approve | — | — | 2622.00 | 2622.00 | não |
-| N01 | reject | reject | type_not_accepted | illegible | — | — | não |
+| N01 | reject | reject | type_not_accepted | type_not_accepted | — | — | não |
 | N02 | reject | reject | type_not_accepted | type_not_accepted | — | — | não |
 | N03 | reject | reject | cpf_mismatch | cpf_mismatch | 2938.54 | 2938.54 | não |
 | N04 | reject | reject | id_missing | id_missing | 2418.00 | 2418.00 | não |

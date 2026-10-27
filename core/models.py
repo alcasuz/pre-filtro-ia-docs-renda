@@ -33,8 +33,8 @@ class Documento:
     earnings_lines: list[Linha]
     fraud_suspected: bool
     fraud_reason: Optional[str] = None
-    # Sinal de legibilidade vindo do OCR. None = sem OCR: a regra usa o critério provisório.
-    legible: Optional[bool] = None
+    # Confiança média das palavras no OCR (0 a 100), sinal de legibilidade da R7.
+    ocr_confidence: Optional[float] = None
 
 
 @dataclass

@@ -16,23 +16,64 @@ from .helpers import CONFIG, CPF, cliente, d, documento_vazio, holerite, tres_me
 # R7: legibilidade
 # ---------------------------------------------------------------------------
 
-def test_legibilidade_pelo_ocr():
-    assert legibility.avaliar(holerite(legivel=False)).reason == "illegible"
-    assert legibility.avaliar(holerite(legivel=True)).status == PASS
+@pytest.mark.parametrize("confianca, status", [
+    (0.0, REJECT),      # N12: nenhuma palavra reconhecida
+    (29.99, REJECT),
+    (30.0, PASS),       # borda: exatamente no limite é legível
+    (30.01, PASS),
+    (62.91, PASS),      # pior holerite legível da base (A16 torto)
+])
+def test_legibilidade_pela_confianca_do_ocr(confianca, status):
+    r = legibility.avaliar(holerite(ocr=confianca), CONFIG)
+    assert r.status == status
+    assert r.reason == (None if status == PASS else "illegible")
+    assert r.details["ocr_confidence"] == confianca
 
 
-def test_legibilidade_provisoria_other_com_tudo_nulo_e_ilegivel():
-    r = legibility.avaliar(documento_vazio())
-    assert (r.status, r.reason, r.details["criterion"]) == (REJECT, "illegible", "provisorio_other_nulo")
+def test_documento_nao_holerite_com_tudo_nulo_mas_legivel_passa_na_legibilidade():
+    # Ex.: N01, a conta de luz: o LLM devolve other com tudo nulo, mas o OCR lê bem.
+    assert legibility.avaliar(documento_vazio(ocr=84.86), CONFIG).status == PASS
 
 
-def test_legibilidade_provisoria_other_com_dados_e_legivel():
-    extrato = holerite(tipo="other", totais=(None, None, None), linhas=[])
-    assert legibility.avaliar(extrato).status == PASS
+def test_limite_de_legibilidade_vem_da_configuracao():
+    from dataclasses import replace
+    r = legibility.avaliar(holerite(ocr=50.0), replace(CONFIG, legibility_min_confidence=60.0))
+    assert r.status == REJECT
 
 
-def test_legibilidade_provisoria_holerite_com_campos_nulos_e_legivel():
-    assert legibility.avaliar(documento_vazio(tipo="payslip")).status == PASS
+def test_ocr_sem_confianca_e_falha_de_legibilidade():
+    r = legibility.avaliar(holerite(ocr=None), CONFIG)
+    assert (r.status, r.reason, r.details["criterion"]) == (REJECT, "illegible", "ocr_unavailable")
+
+
+@pytest.mark.parametrize("falhas_anteriores, status, motivo", [
+    (0, REJECT, "illegible"),
+    (1, REJECT, "illegible"),
+    (2, REVIEW, "too_many_attempts"),   # borda: com 2 falhas anteriores, a nova falha vai para revisão
+    (5, REVIEW, "too_many_attempts"),
+])
+def test_falhas_anteriores_de_legibilidade_no_pedido(falhas_anteriores, status, motivo):
+    r = legibility.avaliar(holerite(ocr=12.0), CONFIG, falhas_anteriores)
+    assert (r.status, r.reason, r.details["prior_legibility_failures"]) == (status, motivo, falhas_anteriores)
+
+
+def test_padrao_sem_falhas_anteriores():
+    assert legibility.avaliar(holerite(ocr=12.0), CONFIG).reason == "illegible"
+
+
+def test_falhas_anteriores_valem_tambem_quando_o_ocr_nao_le():
+    r = legibility.avaliar(holerite(ocr=None), CONFIG, 2)
+    assert (r.status, r.reason) == (REVIEW, "too_many_attempts")
+
+
+def test_documento_legivel_com_falhas_anteriores_passa():
+    assert legibility.avaliar(holerite(ocr=80.0), CONFIG, 2).status == PASS
+
+
+def test_numero_de_tentativas_vem_da_configuracao():
+    from dataclasses import replace
+    r = legibility.avaliar(holerite(ocr=12.0), replace(CONFIG, max_legibility_attempts=5), 2)
+    assert r.reason == "illegible"
 
 
 # ---------------------------------------------------------------------------

@@ -2,12 +2,13 @@
 
 Dois modos de entrada, sem nenhuma chamada de API:
 - --source oracle: documentos montados a partir do gabarito (documents.csv e
-  line_items.csv), simulando OCR e LLM perfeitos. Mede só o motor de regras.
-  Legibilidade = degradation != blurred; fraude = screenshot ou extra_text
-  preenchido; bank_statement conta como other.
+  line_items.csv), simulando um LLM perfeito. Mede o motor de regras com o OCR
+  real. Fraude = screenshot ou extra_text preenchido; bank_statement conta como
+  other.
 - --source cache --model <modelo>: documentos vindos do cache do LLM
-  (cache/<prompt>/<modelo>/). Mede o sistema de ponta a ponta. Sem OCR ainda, a
-  legibilidade usa o critério provisório da regra (tipo other com tudo nulo).
+  (cache/<prompt>/<modelo>/). Mede o sistema de ponta a ponta.
+Nos dois modos, a legibilidade vem da confiança do OCR em cache/ocr/confidence.csv
+(gerado por .venv/bin/python -m core.ocr).
 
 Reporta matriz de confusão (approve, reject, review), acerto por classe, acerto
 do motivo principal, taxa de falso negativo (deveria aprovar e foi reprovado),
@@ -35,6 +36,7 @@ from core import config as configuracao  # noqa: E402
 from core.engine import decidir  # noqa: E402
 from core.inputs import documento_da_extracao  # noqa: E402
 from core.models import Cliente, Documento, Linha  # noqa: E402
+from core.ocr import ARQUIVO_CONFIANCAS, carregar_confiancas  # noqa: E402
 
 PASTA_DADOS = RAIZ / "data"
 PASTA_RESULTADOS = Path(__file__).resolve().parent / "results"
@@ -57,7 +59,7 @@ def clientes():
             for a in ler_csv("applicants.csv")}
 
 
-def documentos_oracle():
+def documentos_oracle(confiancas):
     proventos = defaultdict(list)
     for l in ler_csv("line_items.csv"):
         if l["kind"] == "earning":
@@ -73,12 +75,12 @@ def documentos_oracle():
             earnings_lines=proventos[d["file"]], fraud_suspected=fraude,
             fraud_reason=("print de tela" if d["degradation"] == "screenshot" else "texto de injection")
             if fraude else None,
-            legible=d["degradation"] != "blurred",
+            ocr_confidence=confiancas.get(d["file"]),
         ))
     return por_cliente, faltando
 
 
-def documentos_cache(prompt, modelo):
+def documentos_cache(prompt, modelo, confiancas):
     pasta = RAIZ / "cache" / prompt / modelo
     if not pasta.is_dir():
         sys.exit(f"Cache não encontrado: {pasta.relative_to(RAIZ)}")
@@ -89,23 +91,31 @@ def documentos_cache(prompt, modelo):
             faltando.append(d["file"])
             continue
         extracao = json.loads(caminho.read_text(encoding="utf-8"))["extraction"]
-        por_cliente[d["applicant_id"]].append(documento_da_extracao(d["file"], extracao))
+        por_cliente[d["applicant_id"]].append(documento_da_extracao(d["file"], extracao, confiancas.get(d["file"])))
     return por_cliente, faltando
 
 
 def avaliar(fonte, prompt, modelo):
     cfg = configuracao.carregar()
+    if not ARQUIVO_CONFIANCAS.exists():
+        sys.exit("Sem confiança de OCR: rode .venv/bin/python -m core.ocr")
+    confiancas = carregar_confiancas()
+    arquivos = [d["file"] for d in ler_csv("documents.csv")]
+    sem_ocr = [a for a in arquivos if a not in confiancas]
+    if sem_ocr:
+        sys.exit(f"Documentos sem confiança de OCR: {', '.join(sem_ocr)}")
     if fonte == "oracle":
-        docs, faltando = documentos_oracle()
+        docs, faltando = documentos_oracle(confiancas)
     else:
-        docs, faltando = documentos_cache(prompt, modelo)
+        docs, faltando = documentos_cache(prompt, modelo, confiancas)
     gabarito = ler_csv("ground_truth.csv", encoding="utf-8-sig")
     cadastro = clientes()
 
     linhas = []
     for g in gabarito:
         cid = g["applicant_id"]
-        decisao = decidir(cadastro[cid], docs.get(cid, []), cfg)
+        # A base não tem histórico de envios: todo pedido começa sem falhas de legibilidade.
+        decisao = decidir(cadastro[cid], docs.get(cid, []), cfg, prior_legibility_failures=0)
         esperada_renda = dinheiro(g["expected_valid_income"])
         linhas.append({
             "cliente": cid, "cenario": g["scenario"],
@@ -172,7 +182,8 @@ def relatorio(r, m):
     md = [f"# Avaliação por cliente: {titulo(r)}", "",
           f"Gerado por `evaluation/score_applicants.py`, sem chamadas à API. Configuração: "
           f"`config/default_rules.yaml` v{r['config'].version} "
-          f"(multiplicador {r['config'].income_multiplier}, similaridade {r['config'].name_similarity}).", "",
+          f"(multiplicador {r['config'].income_multiplier}, similaridade {r['config'].name_similarity}, "
+          f"legibilidade OCR >= {r['config'].legibility_min_confidence:g}).", "",
           "## Resumo", "", "```", *resumo(r, m), "```", "",
           "## Matriz de confusão", "", "Linhas: gabarito. Colunas: motor.", "",
           "| gabarito \\ obtido | " + " | ".join(CLASSES) + " |", "|---" * (len(CLASSES) + 1) + "|"]

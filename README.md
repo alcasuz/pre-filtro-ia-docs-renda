@@ -104,9 +104,21 @@ Python · Gemini API (free tier, Flash models) · Tesseract OCR · Streamlit · 
 
 ## How to run
 
-> Partial: covers what exists today (test set generation and the Gemini smoke test). Extraction and evals will be added as they are built.
+> Partial: covers what exists today (test set generation, OCR, extraction, rules engine and evals). The Streamlit demo will be added when it is built.
 
-**Requirements:** Python 3.15 (official installer from python.org) and, for the smoke test, a Gemini API key.
+**Requirements:** Python 3.15 (official installer from python.org), Tesseract OCR with the Portuguese model and, only for the extraction step, a Gemini API key.
+
+**Installing Tesseract on an Intel Mac without Homebrew (MacPorts):**
+
+1. Install MacPorts with the official `.pkg` for your macOS version from https://www.macports.org/install.php (the Xcode Command Line Tools must be installed).
+2. In a new terminal:
+   ```bash
+   sudo port selfupdate
+   sudo port install tesseract tesseract-por
+   tesseract --list-langs     # must list "por"
+   ```
+
+Versions used to calibrate the legibility threshold: **Tesseract 5.5.3** (Leptonica 1.87.0), Portuguese model from the **`tesseract-por` 4.1.0** port (standard `tessdata` family), page segmentation `--psm 3`. OCR confidence changes with the Tesseract version or the language model, so the threshold in `config/default_rules.yaml` must be recalibrated if either changes. `core/ocr.py` finds the binary on the `PATH` or in `/opt/local/bin`; set `TESSERACT_CMD` to use another location.
 
 ```bash
 # 1. Create the virtual environment and install the pinned dependencies
@@ -120,11 +132,20 @@ cp .env.example .env    # then fill in GEMINI_API_KEY= in .env; it is git-ignore
 .venv/bin/python generation/generate_data.py     # data/*.csv + an ok/failed check per applicant
 .venv/bin/python generation/generate_images.py   # data/images/*.png + data/images/_sample.png
 
-# 4. Gemini smoke test: one call, one image, no retries
-.venv/bin/python evaluation/smoke_test.py        # writes evaluation/smoke_test_result.json
+# 4. OCR legibility signal (local, no API calls)
+.venv/bin/python -m core.ocr                     # writes cache/ocr/confidence.csv
+
+# 5. Extraction with Gemini (uses quota; cached per prompt version and model)
+.venv/bin/python evaluation/extract.py --prompt extraction_v2 --model gemini-3.5-flash-lite --min-interval 4 --all
+
+# 6. Tests and evals (local, no API calls)
+.venv/bin/python -m pytest
+.venv/bin/python evaluation/score_documents.py --prompt extraction_v2 --model gemini-3.5-flash-lite
+.venv/bin/python evaluation/score_applicants.py --source oracle
+.venv/bin/python evaluation/score_applicants.py --source cache --model gemini-3.5-flash-lite
 ```
 
-The test set is already committed, so steps 3 and 4 are optional. The images use macOS system fonts; on another system they may differ slightly.
+The test set, the OCR confidences and the extractions are already committed, so steps 3 to 5 are optional: tests and evals run offline from the repository. The images use macOS system fonts; on another system they may differ slightly.
 
 ---
 
