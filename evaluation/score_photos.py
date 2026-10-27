@@ -65,7 +65,7 @@ from core.ocr import carregar_palavras  # noqa: E402
 from core.rules import legibility  # noqa: E402
 from core.rules.completeness import CAMPOS_OBRIGATORIOS  # noqa: E402
 from score_applicants import clientes, documentos_oracle  # noqa: E402
-from score_documents import (CAMPOS_TEXTO, CAMPOS_VALOR, PROMPTS_PRINT_E_FRAUDE, TIPO_NO_EVAL,  # noqa: E402
+from score_documents import (CAMPOS_TEXTO, CAMPOS_VALOR, PROMPTS_PRINT_E_FRAUDE, tipo_esperado,  # noqa: E402
                              casar_linhas, centavos, fmt, pct, percentil, tabela_captura, vazio_para_nulo)
 
 PASTA_DADOS = RAIZ / "data"
@@ -91,7 +91,7 @@ def avaliar_foto(foto, doc, proventos, e, prompt):
     cortados, parciais = set(lista(foto["cut_fields"])), set(lista(foto["partial_fields"]))
     campos, inventados = [], []
     if not doc["true_type"].startswith("payslip"):
-        esperado = TIPO_NO_EVAL[doc["true_type"]]
+        esperado = tipo_esperado(doc["true_type"], prompt)
         campos.append({"campo": "document_type", "esperado": esperado, "obtido": e["document_type"],
                        "ok": esperado == e["document_type"]})
         return {"campos": campos, "inventados": [], "linhas": [], "puladas": [], "extras": []}
@@ -100,7 +100,7 @@ def avaliar_foto(foto, doc, proventos, e, prompt):
             campos.append({"campo": campo, "esperado": "(parcial)", "obtido": e[campo], "ok": None})
             continue
         if campo == "document_type":
-            esperado, obtido = TIPO_NO_EVAL[doc["true_type"]], e[campo]
+            esperado, obtido = tipo_esperado(doc["true_type"], prompt), e[campo]
         elif campo == "fraud_suspected":
             esperado = foto["expected_fraud"] == "yes" or (
                 prompt in PROMPTS_PRINT_E_FRAUDE and foto["expected_capture_type"] in CAPTURAS_DE_TELA)
@@ -384,7 +384,8 @@ def relatorio(r):
                    json.dumps(x["extracao"], ensure_ascii=False, indent=2), "```", ""]
 
     md += ["## Porteiro de legibilidade", "",
-           "Ilegível se o OCR reconhece 0 palavras e o LLM não extrai nada, ou se o CPF tem dígitos inválidos. "
+           "Ilegível se o OCR reconhece 0 palavras e o LLM não extrai nada nem identifica o documento "
+           "(unidentified), ou se o CPF tem dígitos inválidos. "
            "A confiança média do OCR é só informativa. "
            "⚠️ marca legível barrada pelo porteiro (falso negativo) ou ilegível aprovada.", "",
            "| Foto | Palavras OCR | Confiança OCR | Porteiro | Seu julgamento | LLM extraiu certo | |",

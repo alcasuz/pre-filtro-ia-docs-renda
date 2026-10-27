@@ -2,8 +2,11 @@
 
 Um documento é ilegível se:
 1. o OCR não reconhece nenhuma palavra E o LLM não extrai nenhum campo (todos
-   null e nenhuma linha de provento): motivo illegible. Sem OCR (None) conta como
-   zero palavras. A confiança média do OCR não é usada: em fotos reais ela barrava documentos que o LLM lia bem
+   null e nenhuma linha de provento) E o LLM não identifica o documento
+   (document_type = unidentified): motivo illegible. Sem OCR (None) conta como
+   zero palavras. Um documento identificado de outro tipo, mesmo sem campos (ex.:
+   uma conta de luz girada), segue para a regra de tipo (R1). A confiança média
+   do OCR não é usada: em fotos reais ela barrava documentos que o LLM lia bem
    (ex.: imagem de cabeça para baixo);
 2. o CPF lido tem dígitos verificadores inválidos (R2): sinal de leitura errada,
    não de outro titular; motivo illegible.
@@ -39,7 +42,7 @@ def avaliar(doc, config, falhas_anteriores=0):
     detalhes = {"ocr_words": doc.ocr_words, "prior_legibility_failures": falhas_anteriores,
                 "max_attempts": config.max_legibility_attempts}
     cpf = normalizar_cpf(doc.cpf_on_doc)
-    if not doc.ocr_words and not extraiu_algo(doc):
+    if not doc.ocr_words and not extraiu_algo(doc) and doc.document_type == "unidentified":
         motivo, detalhes["criterion"] = "illegible", "ocr_and_llm_empty"
     elif cpf and not cpf_valido(cpf):
         motivo, detalhes["criterion"] = "illegible", "cpf_check_digits"

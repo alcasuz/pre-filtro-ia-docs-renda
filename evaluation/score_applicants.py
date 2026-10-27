@@ -4,9 +4,9 @@ Dois modos de entrada, sem nenhuma chamada de API:
 - --source oracle: documentos montados a partir do gabarito (documents.csv e
   line_items.csv), simulando um LLM perfeito. Mede o motor de regras com o OCR
   real. Fraude = extra_text preenchido; capture_type pela degradation
-  (captura_esperada de score_documents.py); bank_statement conta como other.
-  Documento com degradation = blurred vem sem nenhum campo, como um LLM perfeito
-  devolveria para uma imagem que não dá para ler.
+  (captura_esperada de score_documents.py); o tipo é o true_type do gabarito.
+  Documento com degradation = blurred vem sem nenhum campo e com tipo
+  unidentified, como um LLM perfeito devolveria para uma imagem que não dá para ler.
 - --source cache --model <modelo>: documentos vindos do cache do LLM
   (cache/<prompt>/<modelo>/). Mede o sistema de ponta a ponta.
 Nos dois modos, o número de palavras do OCR vem de cache/ocr/confidence.csv
@@ -62,9 +62,6 @@ def clientes():
             for a in ler_csv("applicants.csv")}
 
 
-TIPO_NO_EVAL = {"bank_statement": "other"}
-
-
 def documentos_oracle(palavras):
     proventos = defaultdict(list)
     for l in ler_csv("line_items.csv"):
@@ -74,11 +71,11 @@ def documentos_oracle(palavras):
     for d in ler_csv("documents.csv"):
         fraude = bool(d["extra_text"])
         if d["degradation"] == "blurred":
-            d = {**d, **{c: "" for c in ("pay_period", "name_on_doc", "cpf_on_doc", "total_earnings",
-                                          "total_deductions", "net_pay")}}
+            d = {**d, "true_type": "unidentified", **{c: "" for c in ("pay_period", "name_on_doc", "cpf_on_doc",
+                                                                       "total_earnings", "total_deductions", "net_pay")}}
             proventos[d["file"]] = []
         por_cliente[d["applicant_id"]].append(Documento(
-            file=d["file"], document_type=TIPO_NO_EVAL.get(d["true_type"], d["true_type"]),
+            file=d["file"], document_type=d["true_type"],
             pay_period=d["pay_period"] or None, name_on_doc=d["name_on_doc"] or None,
             cpf_on_doc=d["cpf_on_doc"] or None, total_earnings=dinheiro(d["total_earnings"]),
             total_deductions=dinheiro(d["total_deductions"]), net_pay=dinheiro(d["net_pay"]),
@@ -229,7 +226,7 @@ def main():
     parser = argparse.ArgumentParser(description="Eval por cliente do motor de regras.")
     parser.add_argument("--source", choices=["oracle", "cache"], required=True)
     parser.add_argument("--model", help="modelo do cache (obrigatório com --source cache)")
-    parser.add_argument("--prompt", default="extraction_v3", help="versão do prompt do cache")
+    parser.add_argument("--prompt", default="extraction_v4", help="versão do prompt do cache")
     args = parser.parse_args()
     if args.source == "cache" and not args.model:
         sys.exit("Com --source cache, informe --model.")

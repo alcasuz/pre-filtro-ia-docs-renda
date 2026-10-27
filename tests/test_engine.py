@@ -40,18 +40,18 @@ def test_legibilidade_vem_antes_do_tipo():
 
 def test_documento_nao_holerite_legivel_com_tudo_nulo_reprova_por_tipo():
     # N01: a conta de luz volta do LLM como other com tudo nulo, mas o OCR a lê bem.
-    r = decidir(cliente(), [documento_vazio(arquivo="T01_conta_de_luz.png", palavras=120)], CONFIG)
+    r = decidir(cliente(), [documento_vazio(tipo="other_document", arquivo="T01_conta_de_luz.png", palavras=120)], CONFIG)
     assert (r.decision, r.main_reason, r.reasons) == (REJECT, "type_not_accepted", ["type_not_accepted"])
 
 
 def test_so_documento_nao_aceito_reprova_por_tipo_sem_motivos_de_periodo_ou_renda():
-    r = decidir(cliente(), [holerite(tipo="other", periodo="2026-09")], CONFIG)
+    r = decidir(cliente(), [holerite(tipo="other_document", periodo="2026-09")], CONFIG)
     assert (r.decision, r.main_reason, r.reasons) == (REJECT, "type_not_accepted", ["type_not_accepted"])
     assert r.valid_income is None and r.months_used == []
 
 
 def test_extrato_extra_e_ignorado_quando_os_holerites_sao_validos():
-    extrato = holerite(tipo="other", periodo="2026-09", arquivo="T01_extrato.png", linhas=[])
+    extrato = holerite(tipo="bank_statement", periodo="2026-09", arquivo="T01_extrato.png", linhas=[])
     r = decidir(cliente(), tres_meses() + [extrato], CONFIG)
     assert r.decision == APPROVE
 
@@ -124,13 +124,13 @@ def test_foto_de_tela_reprova_por_captura_de_tela():
 
 
 def test_print_de_extrato_reprova_por_tipo_e_nao_por_captura():
-    extrato = holerite(tipo="other", periodo="2026-09", arquivo="T01_extrato.png", linhas=[], captura="screenshot")
+    extrato = holerite(tipo="bank_statement", periodo="2026-09", arquivo="T01_extrato.png", linhas=[], captura="screenshot")
     r = decidir(cliente(), [extrato], CONFIG)
     assert (r.decision, r.main_reason, r.reasons) == (REJECT, "type_not_accepted", ["type_not_accepted"])
 
 
 def test_print_de_extrato_extra_junto_com_holerites_e_ignorado():
-    extrato = holerite(tipo="other", periodo="2026-09", arquivo="T01_extrato.png", linhas=[], captura="screenshot")
+    extrato = holerite(tipo="bank_statement", periodo="2026-09", arquivo="T01_extrato.png", linhas=[], captura="screenshot")
     assert decidir(cliente(), tres_meses() + [extrato], CONFIG).decision == APPROVE
 
 
@@ -233,5 +233,18 @@ def test_competencia_lida_com_ano_errado_reprova_como_fora_do_periodo():
 
 def test_documento_extra_com_data_antiga_nao_reprova_o_cliente():
     # Um documento de identidade extra cuja data de expedição o LLM pôs em pay_period é ignorado (R1).
-    extra = holerite(tipo="other", periodo="2016-02", arquivo="T01_identidade.png", linhas=[])
+    extra = holerite(tipo="other_document", periodo="2016-02", arquivo="T01_identidade.png", linhas=[])
     assert decidir(cliente(), tres_meses() + [extra], CONFIG).decision == APPROVE
+
+
+def test_conta_de_luz_girada_que_o_ocr_nao_le_reprova_por_tipo_e_nao_por_ilegivel():
+    # N01 girada: 0 palavras no OCR e nenhum campo, mas o LLM identifica o documento.
+    r = decidir(cliente(), [documento_vazio(tipo="other_document", arquivo="T01_conta_girada.png")], CONFIG)
+    assert (r.decision, r.main_reason) == (REJECT, "type_not_accepted")
+    tipo = next(x for x in r.results if x.rule == "document_type")
+    assert tipo.details["message"].startswith("Você enviou um documento que não é holerite.")
+
+
+def test_imagem_nao_identificada_sem_ocr_e_ilegivel_e_nao_tipo():
+    r = decidir(cliente(), [documento_vazio(tipo="unidentified")], CONFIG)
+    assert (r.decision, r.main_reason, r.reasons) == (REJECT, "illegible", ["illegible"])

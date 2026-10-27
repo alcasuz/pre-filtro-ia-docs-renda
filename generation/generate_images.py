@@ -853,7 +853,7 @@ def salvar(img, caminho):
 
 def renderizar(doc, linhas_doc, salario_cliente):
     rng = random.Random(f"{SEMENTE}:{doc['file']}")
-    if doc["true_type"] == "other":
+    if doc["true_type"] in ("other", "other_document"):
         img = conta_de_luz(doc, rng)
     elif doc["true_type"] == "bank_statement":
         img = extrato(doc, rng)

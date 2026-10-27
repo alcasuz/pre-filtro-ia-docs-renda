@@ -2,7 +2,7 @@
 
 Cada versão simulada decide, documento a documento, se ele é legível. Um
 documento ilegível entra no motor como o porteiro final o reconheceria (0
-palavras no OCR e nenhum campo extraído); um legível entra com o OCR marcando ao
+palavras no OCR, nenhum campo extraído e tipo unidentified); um legível entra com o OCR marcando ao
 menos uma palavra. O motor real roda inalterado, então os critérios do porteiro
 final que não dependem do OCR (CPF com dígitos inválidos) valem em todas as
 versões.
@@ -127,7 +127,7 @@ def aplicar(versao, docs, cliente, leituras, limite):
     if versao == "final":
         return docs
     return [replace(d, ocr_words=max(d.ocr_words or 0, 1)) if legivel(versao, d, cliente, leituras, limite)
-            else replace(d, ocr_words=0, pay_period=None, name_on_doc=None, cpf_on_doc=None, total_earnings=None,
+            else replace(d, ocr_words=0, document_type="unidentified", pay_period=None, name_on_doc=None, cpf_on_doc=None, total_earnings=None,
                          total_deductions=None, net_pay=None, earnings_lines=[])
             for d in docs]
 
@@ -169,7 +169,7 @@ def avaliar_fotos(versao, fotos, extracoes, oracle, cadastro, gabarito, document
 
 def main():
     parser = argparse.ArgumentParser(description="Compara versões do porteiro de legibilidade.")
-    parser.add_argument("--prompt", default="extraction_v3")
+    parser.add_argument("--prompt", default="extraction_v4")
     parser.add_argument("--model", default="gemini-3.5-flash-lite")
     args = parser.parse_args()
 

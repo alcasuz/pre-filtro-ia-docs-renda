@@ -26,10 +26,16 @@ def test_documento_legivel_passa():
 
 
 @pytest.mark.parametrize("palavras", [0, None])
-def test_ocr_sem_palavras_e_llm_sem_nada_e_ilegivel(palavras):
+def test_ocr_sem_palavras_e_llm_sem_nada_e_nao_identificado_e_ilegivel(palavras):
     # N12: imagem desfocada; None = OCR indisponível conta como zero palavras.
-    r = leg(documento_vazio(tipo="payslip", palavras=palavras))
+    r = leg(documento_vazio(tipo="unidentified", palavras=palavras))
     assert (r.status, r.reason, r.details["criterion"]) == (REJECT, "illegible", "ocr_and_llm_empty")
+
+
+@pytest.mark.parametrize("tipo", ["payslip", "bank_statement", "other_document"])
+def test_documento_identificado_sem_campos_nao_e_ilegivel_pelo_ocr(tipo):
+    # N01 girada: o OCR não lê, o LLM não extrai campos, mas reconhece uma conta de luz.
+    assert leg(documento_vazio(tipo=tipo, palavras=0)).status == PASS
 
 
 def test_ocr_sem_palavras_mas_llm_leu_e_legivel():
@@ -46,13 +52,15 @@ def test_ocr_sem_palavras_mas_llm_leu_e_legivel():
     ("earnings_lines", {"linhas": [Linha("SALÁRIO BASE", Decimal("3000.00"), True)]}),
 ])
 def test_um_campo_extraido_basta_para_nao_ser_ilegivel_pelo_ocr(campo, kwargs):
-    vazio = dict(periodo=None, nome=None, cpf=None, totais=(None, None, None), linhas=[], palavras=0)
+    vazio = dict(tipo="unidentified", periodo=None, nome=None, cpf=None, totais=(None, None, None), linhas=[],
+                 palavras=0)
     assert leg(holerite(**{**vazio, **kwargs})).status == PASS
 
 
 def test_ocr_com_palavras_e_llm_sem_nada_e_legivel():
     # N01: conta de luz lida pelo OCR; o LLM devolve other com tudo nulo (decide o tipo, R1).
-    assert leg(documento_vazio(palavras=120)).status == PASS
+    assert leg(documento_vazio(tipo="other_document", palavras=120)).status == PASS
+    assert leg(documento_vazio(tipo="unidentified", palavras=120)).status == PASS
 
 
 @pytest.mark.parametrize("cpf_doc", ["816.425.287-26", "782.943.622-38", "782.943.622", "111.111.111-11"])
@@ -75,7 +83,7 @@ def test_competencia_nao_e_criterio_de_legibilidade(periodo):
 
 
 @pytest.mark.parametrize("doc", [
-    documento_vazio(tipo="payslip", palavras=0),
+    documento_vazio(tipo="unidentified", palavras=0),
     holerite(cpf="782.943.622-38"),
 ], ids=["ocr_e_llm_vazios", "cpf_invalido"])
 @pytest.mark.parametrize("falhas_anteriores, status", [(0, REJECT), (1, REJECT), (2, REVIEW), (5, REVIEW)])
@@ -101,12 +109,33 @@ def test_numero_de_tentativas_vem_da_configuracao():
 # ---------------------------------------------------------------------------
 
 def test_tipo_so_documentos_nao_aceitos_reprova():
-    r = document_type.avaliar([holerite(tipo="other")])
+    r = document_type.avaliar([holerite(tipo="other_document")])
     assert (r.status, r.reason) == (REJECT, "type_not_accepted")
 
 
+@pytest.mark.parametrize("tipo, nome", [
+    ("bank_statement", "um extrato bancário"),
+    ("tax_return", "uma declaração de imposto de renda"),
+    ("inss_benefit", "um comprovante do INSS"),
+    ("other_document", "um documento que não é holerite"),
+    ("unidentified", "um documento que não é holerite"),
+    ("other", "um documento que não é holerite"),   # prompts até o v3
+])
+def test_mensagem_cita_o_tipo_enviado(tipo, nome):
+    r = document_type.avaliar([holerite(tipo=tipo)])
+    assert r.details["message"] == (f"Você enviou {nome}. No momento aceitamos apenas holerite. "
+                                    "Envie os holerites dos últimos 3 meses.")
+
+
+def test_mensagem_com_dois_tipos_cita_os_dois_sem_repetir():
+    docs = [holerite(tipo="bank_statement", arquivo="a.png"), holerite(tipo="bank_statement", arquivo="b.png"),
+            holerite(tipo="tax_return", arquivo="c.png")]
+    assert document_type.avaliar(docs).details["message"].startswith(
+        "Você enviou um extrato bancário e uma declaração de imposto de renda.")
+
+
 def test_tipo_extrato_extra_junto_com_holerites_e_ignorado():
-    extrato = holerite(tipo="other", arquivo="T01_extrato.png")
+    extrato = holerite(tipo="bank_statement", arquivo="T01_extrato.png")
     r = document_type.avaliar(tres_meses() + [extrato])
     assert r.status == PASS and r.details["ignored"] == ["T01_extrato.png"]
 

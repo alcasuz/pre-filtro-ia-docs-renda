@@ -1,7 +1,7 @@
 # Pre-screening rules (fictional business)
 
 > Personal lab. Rules and parameters invented for study purposes; they do not represent any company's policy.
-> Version: v1.5 (2026-10-27)
+> Version: v1.6 (2026-10-27)
 
 ## Glossary (Brazilian terms)
 
@@ -56,8 +56,9 @@ Possible outputs:
 Each rule states **Who does it**: `[LLM]` (read/classify), `[OCR]` or `[CODE]` (calculate/decide). A rule can have more than one part.
 
 ### R1. Document type
-- Types the LLM can return: `payslip`, `payslip_vacation`, `payslip_13th` or `other`.
-- `other` (any file that is not a pay stub: bank statement, INSS benefit, a photo that is not a document, etc.) → **reject**. Message to the applicant: "No momento aceitamos apenas holerite. Envie os holerites dos últimos 3 meses." (*We currently accept pay stubs only. Please send your pay stubs for the last 3 months.*)
+- Types the LLM can return (prompt v4): accepted `payslip`, `payslip_vacation`, `payslip_13th`; not accepted `bank_statement`, `tax_return` (income tax return), `inss_benefit` (INSS benefit statement), `other_document` (any other identifiable document, e.g., a utility bill) and `unidentified` (the image can't be identified).
+- Only documents of a type that is not accepted → **reject** (reason `type_not_accepted`). The message names the type sent: "Você enviou {tipo}. No momento aceitamos apenas holerite. Envie os holerites dos últimos 3 meses." (*You sent {type}. We currently accept pay stubs only. Please send your pay stubs for the last 3 months.*), where {tipo} is "um extrato bancário", "uma declaração de imposto de renda", "um comprovante do INSS" or, for any other type, "um documento que não é holerite". A non-accepted document sent together with pay stubs is ignored.
+- `unidentified` with no OCR words and no field extracted is unreadable (R7), not a type rejection.
 - How the image was captured (`capture_type`): `original_file` (PDF or digitally exported image), `photo_of_paper`, `photo_of_screen` (photo of a monitor or of another device) or `screenshot` (screen capture on a phone or computer).
 - `photo_of_screen` or `screenshot` of a pay stub → **reject** (reason: `screen_capture`). Message to the applicant: "Fotos e prints de tela não são aceitos. Envie o PDF baixado do portal da empresa ou uma foto do holerite impresso." (*Photos and screenshots of a screen are not accepted. Send the PDF downloaded from your company's portal or a photo of the printed pay stub.*)
 - A screen capture is not suspected fraud: it is rejected for the capture, not sent to review. Fraud covers only prompt injection and signs of editing (R7).
@@ -103,7 +104,7 @@ Each rule states **Who does it**: `[LLM]` (read/classify), `[OCR]` or `[CODE]` (
 
 ### R7. Quality and security
 - A document is unreadable → **reject with guidance to resend** if any of these holds:
-  1. the OCR recognizes no words **and** the LLM extracts no field (every field null and no earnings line): reason `illegible`. An image the OCR can't process counts as zero words. The OCR's average confidence is not used: on real photos it blocked documents the LLM read correctly (e.g., an upside-down photo);
+  1. the OCR recognizes no words **and** the LLM extracts no field (every field null and no earnings line) **and** the LLM can't identify the document (`unidentified`): reason `illegible`. An identified document of another type with no fields (e.g., a rotated utility bill) goes to R1 instead. An image the OCR can't process counts as zero words. The OCR's average confidence is not used: on real photos it blocked documents the LLM read correctly (e.g., an upside-down photo);
   2. the CPF fails the check digits (R2): a misreading, reason `illegible`.
 - A pay period far from `analysis_date` is not a legibility criterion: it is decided by R3 (`outside_window`), and a non-accepted extra document is ignored by R1 even if its date was read as a pay period.
 - The same fallback below applies to every legibility failure, whichever criterion caused it.

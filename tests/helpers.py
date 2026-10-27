@@ -38,8 +38,9 @@ def holerite(periodo="2026-09", salario="3000.00", tipo="payslip", arquivo=None,
     )
 
 
-def documento_vazio(tipo="other", arquivo="T01_borrado.png", palavras=0):
-    """O que o LLM devolve para uma imagem desfocada (ou um documento que não é holerite): tudo nulo."""
+def documento_vazio(tipo="unidentified", arquivo="T01_borrado.png", palavras=0):
+    """O que o LLM devolve para uma imagem desfocada (unidentified) ou para um documento que não é
+    holerite (outro tipo): tudo nulo."""
     return Documento(file=arquivo, document_type=tipo, pay_period=None, name_on_doc=None,
                      cpf_on_doc=None, total_earnings=None, total_deductions=None, net_pay=None,
                      earnings_lines=[], fraud_suspected=False, ocr_words=palavras)

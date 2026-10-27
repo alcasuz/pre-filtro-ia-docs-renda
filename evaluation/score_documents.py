@@ -9,7 +9,9 @@ Regras de comparação:
 - textos: iguais exatamente como impressos (sem normalizar), porque o prompt
   pede a cópia literal; campo vazio no gabarito equivale a null;
 - valores: iguais ao centavo (R$ 0,01);
-- document_type: bank_statement e other contam como "other" (tipos da R1);
+- document_type: até o prompt v3, bank_statement e other_document contam como
+  "other" (o único tipo não aceito que o LLM devolvia); do v4 em diante, cada tipo
+  é comparado com ele mesmo;
 - fraud_suspected: o esperado é true quando extra_text está preenchido; até o
   prompt v2, também quando degradation = screenshot (no v3, print não é fraude);
 - capture_type (prompt v3 em diante): o esperado vem da degradation
@@ -37,9 +39,21 @@ RAIZ = Path(__file__).resolve().parent.parent
 PASTA_DADOS = RAIZ / "data"
 PASTA_RESULTADOS = Path(__file__).resolve().parent / "results"
 
-TIPOS = ["payslip", "payslip_vacation", "payslip_13th", "other"]
-TIPO_NO_EVAL = {"payslip": "payslip", "payslip_vacation": "payslip_vacation",
-                "payslip_13th": "payslip_13th", "bank_statement": "other", "other": "other"}
+TIPOS_ATE_V3 = ["payslip", "payslip_vacation", "payslip_13th", "other"]
+TIPOS_V4 = ["payslip", "payslip_vacation", "payslip_13th", "bank_statement", "tax_return", "inss_benefit",
+            "other_document", "unidentified"]
+PROMPTS_TIPO_OTHER = {"extraction_v1", "extraction_v2", "extraction_v3"}
+
+
+def tipos(versao):
+    return TIPOS_ATE_V3 if versao in PROMPTS_TIPO_OTHER else TIPOS_V4
+
+
+def tipo_esperado(true_type, versao):
+    """Tipo que o LLM deveria devolver para o true_type do gabarito, na versão do prompt."""
+    if versao in PROMPTS_TIPO_OTHER and not true_type.startswith("payslip"):
+        return "other"
+    return true_type
 CAMPOS_TEXTO = ["pay_period", "name_on_doc", "cpf_on_doc"]
 CAMPOS_VALOR = ["total_earnings", "total_deductions", "net_pay"]
 TIPOS_CAPTURA = ["original_file", "photo_of_paper", "photo_of_screen", "screenshot"]
@@ -162,7 +176,7 @@ def avaliar(versao, modelo):
     matriz = Counter()
     for doc in avaliados:
         e = extracoes[doc["file"]]
-        esperado_tipo = TIPO_NO_EVAL[doc["true_type"]]
+        esperado_tipo = tipo_esperado(doc["true_type"], versao)
         matriz[(esperado_tipo, e["document_type"])] += 1
         if e["document_type"] == esperado_tipo:
             acertos["document_type"] += 1
@@ -308,10 +322,13 @@ def relatorio_md(r):
             md.append("")
 
     md += ["## Matriz de confusão do document_type", "",
-           "Linhas: gabarito (bank_statement contado como other). Colunas: extraído.", "",
-           "| gabarito \\ extraído | " + " | ".join(TIPOS) + " |", "|---" * (len(TIPOS) + 1) + "|"]
-    for esperado in TIPOS:
-        md.append(f"| {esperado} | " + " | ".join(str(r["matriz"][(esperado, t)]) for t in TIPOS) + " |")
+           "Linhas: gabarito" + (" (bank_statement e other_document contados como other)"
+                                  if r["versao"] in PROMPTS_TIPO_OTHER else "")
+           + ". Colunas: extraído. Desfocados fora.", "",
+           "| gabarito \\ extraído | " + " | ".join(tipos(r["versao"])) + " |",
+           "|---" * (len(tipos(r["versao"])) + 1) + "|"]
+    for esperado in tipos(r["versao"]):
+        md.append(f"| {esperado} | " + " | ".join(str(r["matriz"][(esperado, t)]) for t in tipos(r["versao"])) + " |")
     md.append("")
 
     l = r["linhas"]

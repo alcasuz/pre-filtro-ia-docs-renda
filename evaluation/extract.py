@@ -97,7 +97,14 @@ ESQUEMA_V3 = {
     "properties": {**ESQUEMA["properties"], "capture_type": {"type": "string", "enum": TIPOS_CAPTURA}},
     "required": ESQUEMA["required"] + ["capture_type"],
 }
-ESQUEMAS = {"extraction_v3": ESQUEMA_V3}  # versões fora daqui usam ESQUEMA
+# A partir do v4, document_type separa os tipos não aceitos e o não identificado (R1).
+TIPOS_DOCUMENTO_V4 = ["payslip", "payslip_vacation", "payslip_13th", "bank_statement", "tax_return",
+                      "inss_benefit", "other_document", "unidentified"]
+ESQUEMA_V4 = {
+    **ESQUEMA_V3,
+    "properties": {**ESQUEMA_V3["properties"], "document_type": {"type": "string", "enum": TIPOS_DOCUMENTO_V4}},
+}
+ESQUEMAS = {"extraction_v3": ESQUEMA_V3, "extraction_v4": ESQUEMA_V4}  # versões fora daqui usam ESQUEMA
 
 COLUNAS_LOG = ["executed_at", "file", "model", "prompt_version", "status", "input_tokens",
                "output_tokens", "thought_tokens", "total_tokens", "latency_s", "error"]
