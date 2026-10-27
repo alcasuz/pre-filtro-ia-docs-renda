@@ -1,0 +1,10 @@
+applicant_id,file,source_file,expected_legible,expected_fraud,label_leak,defect,severity,cut_fields,partial_fields
+A01,A01_2026-07_happy-path.jpeg,A01_2026-07.png,yes,yes,no,none,none,,
+A13,A13_2026-07_foto-vertical-de-tela-pc.jpeg,A13_2026-07.png,yes,yes,yes,screen_ui_visible,low,,
+A15,A15_2026-08_foto-horizontal.jpeg,A15_2026-08.png,yes,yes,no,screen_ui_visible,low,,
+A15,A15_2026-07_foto-horizontal.jpeg,A15_2026-07.png,yes,yes,no,none,none,,
+A15,A15_2026-09_foto-vertical-sem-cortar.jpeg,A15_2026-09.png,yes,yes,yes,small_in_frame,medium,,
+N14,N14_2026-07_inclinado.jpeg,N14_2026-07.png,yes,yes,yes,tilted,medium,,
+N14,N14_2026-08_foto-com-flash.jpeg,N14_2026-08.png,yes,yes,no,flash_glare,medium,,
+N14,N14_2026-09_cortado.jpeg,N14_2026-09.png,yes,yes,no,cropped,high,total_earnings;earnings_lines.description,name_on_doc
+A10,A10_2026-08_ferias_tremido.jpeg,A10_2026-08_ferias.png,no,yes,yes,motion_blur,high,,
