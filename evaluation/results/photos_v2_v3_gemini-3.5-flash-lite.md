@@ -12,7 +12,7 @@ capture_type certo (todas as fotos, legíveis ou não): 9/9 (100.0%)
 Porteiro OCR (limite 30): legíveis barradas (falso negativo): 0 | ilegíveis aprovadas: 1 (A10_2026-08_ferias_tremido.jpeg)
 API: 9 chamadas | erros: 0/9 (0.0%) | latência p50 12.19 s, p90 43.37 s
 Tokens médios por foto: input 1999 | output 215 | thought 0 | total 2215
-Fotos sem extração no cache: A14_2026-08_occluded.jpg, A14_2026-09_upside_down.jpg, A15_2026-07_cropped-high.jpg, A15_2026-08_motion_blur.jpg, A15_2026-09_motion_blur-medium.jpg, A16_2026-07_cropped.jpg, A16_2026-08_flash_glare.jpg, A16_2026-09_flash_glare.jpg, N01_conta_de_luz_rotated.jpg, N02_extrato_2026-09_none.jpg, N03_2026-07_cropped-high.jpg
+Fotos sem extração no cache: A14_2026-08_occluded-high.jpg, A14_2026-09_upside_down.jpg, A15_2026-07_cropped-high.jpg, A15_2026-08_motion_blur-low.jpg, A15_2026-09_motion_blur-medium.jpg, A16_2026-07_cropped-low.jpg, A16_2026-08_flash_glare-low.jpg, A16_2026-09_flash_glare-low.jpg, N01_conta_de_luz_rotated-low.jpg, N02_extrato_2026-09_none.jpg, N03_2026-07_cropped-high.jpg
 ```
 
 ## Por defeito
@@ -249,17 +249,6 @@ Limite atual: 30 (provisório, calibrado na base sintética). ⚠️ marca legí
 
 | Foto | Confiança OCR | Palavras | Porteiro | Seu julgamento | LLM extraiu certo | |
 |---|---|---|---|---|---|---|
-| A14_2026-08_occluded.jpg | null | — | ilegível | legível | fora da acurácia | ⚠️ |
-| A14_2026-09_upside_down.jpg | null | — | ilegível | legível | fora da acurácia | ⚠️ |
-| A15_2026-07_cropped-high.jpg | null | — | ilegível | legível | fora da acurácia | ⚠️ |
-| A15_2026-08_motion_blur.jpg | null | — | ilegível | legível | fora da acurácia | ⚠️ |
-| A15_2026-09_motion_blur-medium.jpg | null | — | ilegível | legível | fora da acurácia | ⚠️ |
-| A16_2026-07_cropped.jpg | null | — | ilegível | legível | fora da acurácia | ⚠️ |
-| A16_2026-08_flash_glare.jpg | null | — | ilegível | legível | fora da acurácia | ⚠️ |
-| A16_2026-09_flash_glare.jpg | null | — | ilegível | legível | fora da acurácia | ⚠️ |
-| N01_conta_de_luz_rotated.jpg | null | — | ilegível | legível | fora da acurácia | ⚠️ |
-| N02_extrato_2026-09_none.jpg | null | — | ilegível | legível | fora da acurácia | ⚠️ |
-| N03_2026-07_cropped-high.jpg | null | — | ilegível | legível | fora da acurácia | ⚠️ |
 | A10_2026-08_ferias_tremido.jpeg | 37.25 | 8 | legível | ilegível | fora da acurácia | ⚠️ |
 | N14_2026-07_inclinado.jpeg | 41.00 | 1 | legível | legível | 9/9 (tudo) |  |
 | A15_2026-09_foto-vertical-sem-cortar.jpeg | 51.83 | 24 | legível | legível | 9/9 (tudo) |  |
@@ -269,3 +258,5 @@ Limite atual: 30 (provisório, calibrado na base sintética). ⚠️ marca legí
 | A15_2026-07_foto-horizontal.jpeg | 77.08 | 49 | legível | legível | 9/9 (tudo) |  |
 | A15_2026-08_foto-horizontal.jpeg | 80.21 | 73 | legível | legível | 9/9 (tudo) |  |
 | N14_2026-08_foto-com-flash.jpeg | 85.79 | 33 | legível | legível | 9/9 (tudo) |  |
+
+Sem OCR (rode `.venv/bin/python -m core.ocr --set v2`): A14_2026-08_occluded-high.jpg, A14_2026-09_upside_down.jpg, A15_2026-07_cropped-high.jpg, A15_2026-08_motion_blur-low.jpg, A15_2026-09_motion_blur-medium.jpg, A16_2026-07_cropped-low.jpg, A16_2026-08_flash_glare-low.jpg, A16_2026-09_flash_glare-low.jpg, N01_conta_de_luz_rotated-low.jpg, N02_extrato_2026-09_none.jpg, N03_2026-07_cropped-high.jpg

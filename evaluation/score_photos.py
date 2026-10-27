@@ -7,9 +7,9 @@ Nenhuma chamada de API.
 
 Regras de comparação (as mesmas de score_documents.py):
 - textos exatamente como impressos; valores ao centavo;
-- fraud_suspected: o esperado vem da coluna expected_fraud do photos.csv, que
-  marcou como fraude as fotos de tela (regra até o prompt v2). Do v3 em diante,
-  foto de tela não é fraude e nenhuma foto tem injection ou edição: esperado false;
+- fraud_suspected: o esperado vem da coluna expected_fraud do photos.csv
+  (injection ou edição); até o prompt v2, foto ou print de tela (pela coluna
+  expected_capture_type) também era fraude;
 - capture_type (v3 em diante): o esperado vem da coluna expected_capture_type;
   fica fora da acurácia, numa matriz própria;
 - cut_fields: o certo é null; valor preenchido conta como erro e como inventado.
@@ -37,6 +37,7 @@ sys.path.insert(0, str(RAIZ))
 sys.path.insert(0, str(Path(__file__).resolve().parent))
 
 from core import config as configuracao  # noqa: E402
+from core.models import CAPTURAS_DE_TELA  # noqa: E402
 from score_documents import (CAMPOS_TEXTO, CAMPOS_VALOR, PROMPTS_PRINT_E_FRAUDE, TIPO_NO_EVAL,  # noqa: E402
                              casar_linhas, centavos, fmt, pct, percentil, tabela_captura, vazio_para_nulo)
 
@@ -65,7 +66,8 @@ def avaliar_foto(foto, doc, proventos, e, prompt):
         if campo == "document_type":
             esperado, obtido = TIPO_NO_EVAL[doc["true_type"]], e[campo]
         elif campo == "fraud_suspected":
-            esperado = foto["expected_fraud"] == "yes" and prompt in PROMPTS_PRINT_E_FRAUDE
+            esperado = foto["expected_fraud"] == "yes" or (
+                prompt in PROMPTS_PRINT_E_FRAUDE and foto["expected_capture_type"] in CAPTURAS_DE_TELA)
             obtido = e[campo]
         elif campo in cortados:
             esperado, obtido = None, e[campo]
@@ -262,7 +264,8 @@ def relatorio(r):
            "⚠️ marca legível barrada pelo porteiro (falso negativo) ou ilegível aprovada.", "",
            "| Foto | Confiança OCR | Palavras | Porteiro | Seu julgamento | LLM extraiu certo | |",
            "|---|---|---|---|---|---|---|"]
-    for x in sorted(r["resultados"], key=lambda x: float(x["ocr"]["mean_confidence"]) if x["ocr"] else -1):
+    sem_ocr = [x["foto"]["file"] for x in r["resultados"] if not x["ocr"]]
+    for x in sorted((x for x in r["resultados"] if x["ocr"]), key=lambda x: float(x["ocr"]["mean_confidence"])):
         conf = float(x["ocr"]["mean_confidence"]) if x["ocr"] else None
         passa = conf is not None and conf >= r["limite"]
         legivel = x["foto"]["expected_legible"] == "yes"
@@ -274,6 +277,8 @@ def relatorio(r):
         alerta = "⚠️" if passa != legivel else ""
         md.append(f"| {x['foto']['file']} | {fmt(conf)} | {x['ocr']['words'] if x['ocr'] else '—'} | "
                   f"{'legível' if passa else 'ilegível'} | {'legível' if legivel else 'ilegível'} | {llm} | {alerta} |")
+    if sem_ocr:
+        md += ["", "Sem OCR (rode `.venv/bin/python -m core.ocr --set v2`): " + ", ".join(sem_ocr)]
     return "\n".join(md) + "\n"
 
 
