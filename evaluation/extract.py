@@ -1,7 +1,8 @@
 """Extração com o Gemini: uma imagem + o prompt de extração -> JSON estruturado.
 
 Para cada arquivo, envia a imagem de data/images/ e o prompt de
-prompts/<versão>.txt ao modelo, com structured output no ESQUEMA abaixo, e
+prompts/<versão>.txt ao modelo, com structured output no ESQUEMA abaixo (o v3
+acrescenta capture_type), e
 salva a resposta em cache/<versão>/<modelo>/<file>.json. Se o arquivo já
 existir no cache, a API não é chamada; por isso, rodar de novo continua de onde
 parou. Cada chamada (com sucesso ou erro) é registrada em
@@ -19,8 +20,12 @@ Erros, sempre sem retentativa:
 - qualquer outro erro: para a execução, porque tende a se repetir.
 A chave é lida do .env e nunca é impressa.
 
+Com --set v2, a lista vem de data/photos.csv, as imagens de data/images/v2/ e o
+cache fica em cache/photos_v2/<versão>/<modelo>/, separado da base v1.
+
 Uso:
   .venv/bin/python evaluation/extract.py --prompt extraction_v2 --model gemini-3.5-flash --all
+  .venv/bin/python evaluation/extract.py --set v2 --prompt extraction_v2 --model gemini-3.5-flash-lite --all
   .venv/bin/python evaluation/extract.py --prompt extraction_v1 A01_2026-07.png [...]
 """
 
@@ -43,6 +48,12 @@ from google.genai import types
 RAIZ = Path(__file__).resolve().parent.parent
 PASTA_IMAGENS = RAIZ / "data" / "images"
 ARQUIVO_DOCUMENTOS = RAIZ / "data" / "documents.csv"
+CONJUNTOS = {
+    # conjunto: (pasta das imagens, pasta-base do cache)
+    "v1": (PASTA_IMAGENS, RAIZ / "cache"),
+    "v2": (PASTA_IMAGENS / "v2", RAIZ / "cache" / "photos_v2"),
+}
+TIPOS_MIME = {".png": "image/png", ".jpg": "image/jpeg", ".jpeg": "image/jpeg"}
 MODELO_PADRAO = "gemini-3.8-flash"
 # Sem tempo limite, uma conexão que cai (ex.: o Mac entra em repouso) deixa a
 # chamada esperando para sempre. 300 s é mais que o dobro da maior latência vista.
@@ -79,6 +90,14 @@ ESQUEMA = {
     "required": ["document_type", "pay_period", "name_on_doc", "cpf_on_doc", "total_earnings",
                  "total_deductions", "net_pay", "earnings_lines", "fraud_suspected", "fraud_reason"],
 }
+# A partir do v3, o modelo também informa como a imagem foi capturada (R1).
+TIPOS_CAPTURA = ["original_file", "photo_of_paper", "photo_of_screen", "screenshot"]
+ESQUEMA_V3 = {
+    "type": "object",
+    "properties": {**ESQUEMA["properties"], "capture_type": {"type": "string", "enum": TIPOS_CAPTURA}},
+    "required": ESQUEMA["required"] + ["capture_type"],
+}
+ESQUEMAS = {"extraction_v3": ESQUEMA_V3}  # versões fora daqui usam ESQUEMA
 
 COLUNAS_LOG = ["executed_at", "file", "model", "prompt_version", "status", "input_tokens",
                "output_tokens", "thought_tokens", "total_tokens", "latency_s", "error"]
@@ -93,7 +112,7 @@ class Pular(Exception):
 
 
 class Extrator:
-    def __init__(self, cliente, chave, versao, modelo, intervalo_minimo=0.0):
+    def __init__(self, cliente, chave, versao, modelo, intervalo_minimo=0.0, conjunto="v1"):
         self.cliente = cliente
         self.chave = chave
         self.versao = versao
@@ -101,7 +120,9 @@ class Extrator:
         self.intervalo_minimo = intervalo_minimo
         self.ultima_chamada = None
         self.prompt = (RAIZ / "prompts" / f"{versao}.txt").read_text(encoding="utf-8")
-        self.pasta_cache = RAIZ / "cache" / versao / modelo
+        self.esquema = ESQUEMAS.get(versao, ESQUEMA)
+        self.pasta_imagens, base_cache = CONJUNTOS[conjunto]
+        self.pasta_cache = base_cache / versao / modelo
         self.arquivo_log = self.pasta_cache / "_log.csv"
         self.pasta_cache.mkdir(parents=True, exist_ok=True)
 
@@ -119,7 +140,8 @@ class Extrator:
         if destino.exists():
             return "cache"
 
-        imagem_b64 = base64.b64encode((PASTA_IMAGENS / arquivo).read_bytes()).decode("ascii")
+        imagem = self.pasta_imagens / arquivo
+        imagem_b64 = base64.b64encode(imagem.read_bytes()).decode("ascii")
         # Respeita o limite por minuto: o início de duas chamadas fica a pelo
         # menos intervalo_minimo segundos de distância (leituras do cache não contam).
         if self.ultima_chamada is not None:
@@ -136,9 +158,9 @@ class Extrator:
                 model=self.modelo,
                 input=[
                     {"type": "text", "text": self.prompt},
-                    {"type": "image", "data": imagem_b64, "mime_type": "image/png"},
+                    {"type": "image", "data": imagem_b64, "mime_type": TIPOS_MIME[imagem.suffix.lower()]},
                 ],
-                response_format={"type": "text", "mime_type": "application/json", "schema": ESQUEMA},
+                response_format={"type": "text", "mime_type": "application/json", "schema": self.esquema},
                 store=False,
             )
         except Exception as erro:
@@ -220,6 +242,8 @@ def ordem_de_prioridade(documentos):
 def main():
     parser = argparse.ArgumentParser(description="Extrai documentos com o Gemini, com cache.")
     parser.add_argument("--prompt", required=True, help="versão do prompt, ex.: extraction_v2")
+    parser.add_argument("--set", choices=sorted(CONJUNTOS), default="v1",
+                        help="v1: base sintética (documents.csv); v2: fotos (photos.csv)")
     parser.add_argument("--model", default=MODELO_PADRAO, help=f"modelo (padrão: {MODELO_PADRAO})")
     parser.add_argument("--min-interval", type=float, default=0.0,
                         help="segundos mínimos entre o início de duas chamadas (ex.: 4 = até 15 por minuto)")
@@ -230,14 +254,18 @@ def main():
 
     if args.all == bool(args.arquivos):
         sys.exit("Informe --all ou uma lista de arquivos (não os dois).")
-    if args.all:
+    pasta_imagens = CONJUNTOS[args.set][0]
+    if args.all and args.set == "v2":
+        with open(RAIZ / "data" / "photos.csv", newline="", encoding="utf-8") as f:
+            arquivos = [d["file"] for d in csv.DictReader(f)]
+    elif args.all:
         with open(ARQUIVO_DOCUMENTOS, newline="", encoding="utf-8") as f:
             arquivos = ordem_de_prioridade(list(csv.DictReader(f)))
     else:
         arquivos = args.arquivos
-    faltando = [a for a in arquivos if not (PASTA_IMAGENS / a).exists()]
+    faltando = [a for a in arquivos if not (pasta_imagens / a).exists()]
     if faltando:
-        sys.exit(f"Arquivos não encontrados em data/images/: {', '.join(faltando)}")
+        sys.exit(f"Arquivos não encontrados em {pasta_imagens.relative_to(RAIZ)}/: {', '.join(faltando)}")
     if not (RAIZ / "prompts" / f"{args.prompt}.txt").exists():
         sys.exit(f"Prompt não encontrado: prompts/{args.prompt}.txt")
 
@@ -252,7 +280,7 @@ def main():
         http_options=types.HttpOptions(timeout=TEMPO_LIMITE_MS,
                                        retry_options=types.HttpRetryOptions(attempts=0)),
     )
-    extrator = Extrator(cliente, chave, args.prompt, args.model, args.min_interval)
+    extrator = Extrator(cliente, chave, args.prompt, args.model, args.min_interval, args.set)
     print(f"Modelo: {args.model} | prompt: {args.prompt} | intervalo mínimo: {args.min_interval:g} s | "
           f"cache: {extrator.pasta_cache.relative_to(RAIZ)}", flush=True)
 

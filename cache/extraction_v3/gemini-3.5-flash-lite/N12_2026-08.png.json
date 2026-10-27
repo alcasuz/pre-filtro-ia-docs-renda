@@ -1,0 +1,19 @@
+{
+  "file": "N12_2026-08.png",
+  "model": "gemini-3.5-flash-lite",
+  "prompt_version": "extraction_v3",
+  "prompt_sha256": "2b395d00950b13735b188b537f86ff132afd14558d7f6c294da2ae570e86d09f",
+  "extraction": {
+    "document_type": "payslip",
+    "pay_period": null,
+    "name_on_doc": null,
+    "cpf_on_doc": null,
+    "total_earnings": null,
+    "total_deductions": null,
+    "net_pay": null,
+    "earnings_lines": [],
+    "fraud_suspected": false,
+    "fraud_reason": null,
+    "capture_type": "original_file"
+  }
+}

@@ -1,17 +1,18 @@
 """Motor de regras: aplica as regras da v1 aos documentos de um cliente e decide.
 
-Ordem (rules.md): legibilidade, tipo, titular, período, renda e, por fim, as
-revisões (consistência e fraude). Todas as regras rodam, sem parar na primeira
+Ordem (rules.md): legibilidade, tipo, captura de tela, titular, período, renda e,
+por fim, as revisões (consistência e fraude). Todas as regras rodam, sem parar na primeira
 falha, para que a lista completa de motivos e a renda fiquem registradas mesmo
 quando o cliente é reprovado. Decisão: qualquer reject vence qualquer review;
 qualquer review vence approve. O motivo principal é o primeiro reject na ordem
 das regras ou, sem reject, o primeiro review.
 
 Quais documentos cada regra recebe:
-- legibilidade: todos os documentos, pela confiança do OCR (Documento.ocr_confidence);
+- legibilidade: todos os documentos, pela confiança do OCR (Documento.ocr_confidence)
+  e pelos dígitos verificadores do CPF lido;
 - fraude: os legíveis;
 - tipo: os legíveis; um documento de outro tipo junto com holerites é ignorado;
-- titular e consistência: os holerites legíveis;
+- captura de tela, titular e consistência: os holerites legíveis;
 - período e renda: todos os holerites, inclusive um ilegível cujos dados existam
   (modo oracle). Sem nenhum holerite, período e renda não são avaliados.
 
@@ -23,13 +24,14 @@ Documento escalado por tentativas (too_many_attempts): os dados dele faltam no
 período e na renda, que reprovariam o cliente por isso e anulariam o fallback
 (reject vence review). Então, quando há um documento escalado, uma reprovação de
 período ou renda vira revisão, com o motivo original mantido na lista. As outras
-reprovações (tipo, titular) continuam valendo.
+reprovações (tipo, captura de tela, titular) continuam valendo.
 """
 
 from .models import APPROVE, PASS, REJECT, REVIEW, Decisao
-from .rules import consistency, document_type, fraud, identification, income, legibility, time_window
+from .rules import (consistency, document_type, fraud, identification, income, legibility, screen_capture,
+                    time_window)
 
-ORDEM_REGRAS = ["legibility", "document_type", "identification", "time_window", "income",
+ORDEM_REGRAS = ["legibility", "document_type", "screen_capture", "identification", "time_window", "income",
                 "consistency", "fraud"]
 
 
@@ -43,6 +45,7 @@ def decidir(cliente, documentos, config, prior_legibility_failures=0):
     holerites = [d for d in documentos if document_type.aceito(d)]
     holerites_legiveis = [d for d in holerites if d.file not in ilegiveis]
 
+    resultados += [screen_capture.avaliar(d) for d in holerites_legiveis]
     resultados += [identification.avaliar(d, cliente, config) for d in holerites_legiveis]
 
     meses_usados, renda_valida = [], None

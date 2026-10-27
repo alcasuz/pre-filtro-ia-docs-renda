@@ -3,8 +3,8 @@
 Dois modos de entrada, sem nenhuma chamada de API:
 - --source oracle: documentos montados a partir do gabarito (documents.csv e
   line_items.csv), simulando um LLM perfeito. Mede o motor de regras com o OCR
-  real. Fraude = screenshot ou extra_text preenchido; bank_statement conta como
-  other.
+  real. Fraude = extra_text preenchido; capture_type pela degradation
+  (captura_esperada de score_documents.py); bank_statement conta como other.
 - --source cache --model <modelo>: documentos vindos do cache do LLM
   (cache/<prompt>/<modelo>/). Mede o sistema de ponta a ponta.
 Nos dois modos, a legibilidade vem da confiança do OCR em cache/ocr/confidence.csv
@@ -31,12 +31,14 @@ from pathlib import Path
 
 RAIZ = Path(__file__).resolve().parent.parent
 sys.path.insert(0, str(RAIZ))
+sys.path.insert(0, str(Path(__file__).resolve().parent))
 
 from core import config as configuracao  # noqa: E402
 from core.engine import decidir  # noqa: E402
 from core.inputs import documento_da_extracao  # noqa: E402
 from core.models import Cliente, Documento, Linha  # noqa: E402
 from core.ocr import ARQUIVO_CONFIANCAS, carregar_confiancas  # noqa: E402
+from score_documents import captura_esperada  # noqa: E402
 
 PASTA_DADOS = RAIZ / "data"
 PASTA_RESULTADOS = Path(__file__).resolve().parent / "results"
@@ -66,16 +68,15 @@ def documentos_oracle(confiancas):
             proventos[l["file"]].append(Linha(l["description"], dinheiro(l["amount"]), l["counts_as_income"] == "yes"))
     por_cliente, faltando = defaultdict(list), []
     for d in ler_csv("documents.csv"):
-        fraude = d["degradation"] == "screenshot" or bool(d["extra_text"])
+        fraude = bool(d["extra_text"])
         por_cliente[d["applicant_id"]].append(Documento(
             file=d["file"], document_type=TIPO_NO_EVAL.get(d["true_type"], d["true_type"]),
             pay_period=d["pay_period"] or None, name_on_doc=d["name_on_doc"] or None,
             cpf_on_doc=d["cpf_on_doc"] or None, total_earnings=dinheiro(d["total_earnings"]),
             total_deductions=dinheiro(d["total_deductions"]), net_pay=dinheiro(d["net_pay"]),
             earnings_lines=proventos[d["file"]], fraud_suspected=fraude,
-            fraud_reason=("print de tela" if d["degradation"] == "screenshot" else "texto de injection")
-            if fraude else None,
-            ocr_confidence=confiancas.get(d["file"]),
+            fraud_reason="texto de injection" if fraude else None,
+            ocr_confidence=confiancas.get(d["file"]), capture_type=captura_esperada(d),
         ))
     return por_cliente, faltando
 
@@ -220,7 +221,7 @@ def main():
     parser = argparse.ArgumentParser(description="Eval por cliente do motor de regras.")
     parser.add_argument("--source", choices=["oracle", "cache"], required=True)
     parser.add_argument("--model", help="modelo do cache (obrigatório com --source cache)")
-    parser.add_argument("--prompt", default="extraction_v2", help="versão do prompt do cache")
+    parser.add_argument("--prompt", default="extraction_v3", help="versão do prompt do cache")
     args = parser.parse_args()
     if args.source == "cache" and not args.model:
         sys.exit("Com --source cache, informe --model.")

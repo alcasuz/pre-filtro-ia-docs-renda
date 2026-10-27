@@ -8,10 +8,12 @@ A confiança depende da versão do Tesseract e do modelo de idioma; ambos são
 registrados junto com o resultado, porque o limite de legibilidade só vale para
 a combinação em que foi calibrado.
 
-Uso (gera cache/ocr/confidence.csv para todas as imagens de data/documents.csv):
-  .venv/bin/python -m core.ocr
+Uso:
+  .venv/bin/python -m core.ocr            # base v1 (data/documents.csv) -> cache/ocr/confidence.csv
+  .venv/bin/python -m core.ocr --set v2   # fotos v2 (data/photos.csv)   -> cache/ocr/confidence_v2.csv
 """
 
+import argparse
 import csv
 import os
 import shutil
@@ -45,6 +47,12 @@ def confianca_media(caminho, idioma=IDIOMA):
 
 
 ARQUIVO_CONFIANCAS = RAIZ / "cache" / "ocr" / "confidence.csv"
+CONJUNTOS = {
+    # conjunto: (lista de arquivos, pasta das imagens, arquivo de saída)
+    "v1": (RAIZ / "data" / "documents.csv", RAIZ / "data" / "images", ARQUIVO_CONFIANCAS),
+    "v2": (RAIZ / "data" / "photos.csv", RAIZ / "data" / "images" / "v2",
+           RAIZ / "cache" / "ocr" / "confidence_v2.csv"),
+}
 
 
 def carregar_confiancas(caminho=ARQUIVO_CONFIANCAS):
@@ -54,17 +62,20 @@ def carregar_confiancas(caminho=ARQUIVO_CONFIANCAS):
 
 
 def main():
-    with open(RAIZ / "data" / "documents.csv", newline="", encoding="utf-8") as f:
+    parser = argparse.ArgumentParser(description="Confiança média do OCR para cada imagem do conjunto.")
+    parser.add_argument("--set", choices=sorted(CONJUNTOS), default="v1")
+    args = parser.parse_args()
+    lista, pasta, destino = CONJUNTOS[args.set]
+    with open(lista, newline="", encoding="utf-8") as f:
         arquivos = [d["file"] for d in csv.DictReader(f)]
     versao = versao_tesseract()
-    destino = ARQUIVO_CONFIANCAS
     destino.parent.mkdir(parents=True, exist_ok=True)
     with open(destino, "w", newline="", encoding="utf-8") as f:
         escritor = csv.DictWriter(f, lineterminator="\n", fieldnames=[
             "file", "mean_confidence", "words", "tesseract_version", "lang", "config"])
         escritor.writeheader()
         for i, arquivo in enumerate(arquivos, 1):
-            resultado = confianca_media(RAIZ / "data" / "images" / arquivo)
+            resultado = confianca_media(pasta / arquivo)
             escritor.writerow({"file": arquivo, **resultado, "tesseract_version": versao,
                                "lang": IDIOMA, "config": CONFIG_TESSERACT})
             print(f"[{i}/{len(arquivos)}] {arquivo}: {resultado['mean_confidence']} ({resultado['words']} palavras)",

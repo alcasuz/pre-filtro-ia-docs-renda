@@ -1,0 +1,25 @@
+{
+  "file": "A15_2026-08_foto-horizontal.jpeg",
+  "model": "gemini-3.5-flash-lite",
+  "prompt_version": "extraction_v3",
+  "prompt_sha256": "2b395d00950b13735b188b537f86ff132afd14558d7f6c294da2ae570e86d09f",
+  "extraction": {
+    "document_type": "payslip",
+    "pay_period": "2026-08",
+    "name_on_doc": "ANTÔNIO MEDEIROS REZENDE",
+    "cpf_on_doc": "966.362.917-70",
+    "total_earnings": 4050.0,
+    "total_deductions": 535.84,
+    "net_pay": 3514.16,
+    "earnings_lines": [
+      {
+        "description": "SALÁRIO BASE",
+        "amount": 4050.0,
+        "counts_as_income": true
+      }
+    ],
+    "fraud_suspected": false,
+    "fraud_reason": null,
+    "capture_type": "photo_of_screen"
+  }
+}

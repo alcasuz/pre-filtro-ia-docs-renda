@@ -1,0 +1,30 @@
+{
+  "file": "A13_2026-09.png",
+  "model": "gemini-3.5-flash-lite",
+  "prompt_version": "extraction_v3",
+  "prompt_sha256": "2b395d00950b13735b188b537f86ff132afd14558d7f6c294da2ae570e86d09f",
+  "extraction": {
+    "document_type": "payslip",
+    "pay_period": "2026-09",
+    "name_on_doc": "CONCEIÇÃO VIEIRA NOGUEIRA",
+    "cpf_on_doc": "925.912.632-05",
+    "total_earnings": 3386.86,
+    "total_deductions": 368.73,
+    "net_pay": 3018.13,
+    "earnings_lines": [
+      {
+        "description": "SALÁRIO BASE",
+        "amount": 2955.25,
+        "counts_as_income": true
+      },
+      {
+        "description": "ADICIONAL NOTURNO",
+        "amount": 431.61,
+        "counts_as_income": true
+      }
+    ],
+    "fraud_suspected": false,
+    "fraud_reason": null,
+    "capture_type": "original_file"
+  }
+}

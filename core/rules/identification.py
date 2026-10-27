@@ -2,7 +2,9 @@
 
 Com CPF: compara só os 11 dígitos com o cadastro (qualquer formato); igual
 confirma o titular e o nome não é avaliado. Sem CPF: similaridade do nome com o
-cadastro, com os limites name_ok e name_review da configuração.
+cadastro, com os limites name_ok e name_review da configuração. Um CPF com
+dígitos verificadores inválidos não chega aqui: a legibilidade (R7) já o barrou
+como leitura errada, para não virar cpf_mismatch.
 """
 
 import re

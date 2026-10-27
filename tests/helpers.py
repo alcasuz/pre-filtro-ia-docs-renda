@@ -24,7 +24,7 @@ def cliente(nome="Otávio Oliveira Araújo", cpf=CPF, parcela="1000.00", analise
 
 def holerite(periodo="2026-09", salario="3000.00", tipo="payslip", arquivo=None, linhas=None,
              nome="OTÁVIO OLIVEIRA ARAÚJO", cpf="782.943.622-39", totais=("3000.00", "250.00", "2750.00"),
-             fraude=False, motivo_fraude=None, ocr=88.0):
+             fraude=False, motivo_fraude=None, ocr=88.0, captura="original_file"):
     if linhas is None:
         linhas = [Linha("SALÁRIO BASE", d(salario), True)]
     return Documento(
@@ -34,6 +34,7 @@ def holerite(periodo="2026-09", salario="3000.00", tipo="payslip", arquivo=None,
         total_deductions=None if totais[1] is None else d(totais[1]),
         net_pay=None if totais[2] is None else d(totais[2]),
         earnings_lines=linhas, fraud_suspected=fraude, fraud_reason=motivo_fraude, ocr_confidence=ocr,
+        capture_type=captura,
     )
 
 

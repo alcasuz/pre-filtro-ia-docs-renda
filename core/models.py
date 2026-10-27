@@ -9,6 +9,8 @@ PASS, REJECT, REVIEW = "pass", "reject", "review"
 APPROVE = "approve"
 
 TIPOS_ACEITOS = ("payslip", "payslip_vacation", "payslip_13th")
+# Como a imagem foi capturada (R1); as capturas de tela são reprovadas.
+CAPTURAS_DE_TELA = ("photo_of_screen", "screenshot")
 
 
 @dataclass
@@ -35,6 +37,9 @@ class Documento:
     fraud_reason: Optional[str] = None
     # Confiança média das palavras no OCR (0 a 100), sinal de legibilidade da R7.
     ocr_confidence: Optional[float] = None
+    # original_file, photo_of_paper, photo_of_screen ou screenshot; None em extrações
+    # anteriores ao prompt v3, que não informam a captura.
+    capture_type: Optional[str] = None
 
 
 @dataclass

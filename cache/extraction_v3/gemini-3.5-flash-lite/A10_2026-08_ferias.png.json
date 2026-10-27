@@ -1,0 +1,30 @@
+{
+  "file": "A10_2026-08_ferias.png",
+  "model": "gemini-3.5-flash-lite",
+  "prompt_version": "extraction_v3",
+  "prompt_sha256": "2b395d00950b13735b188b537f86ff132afd14558d7f6c294da2ae570e86d09f",
+  "extraction": {
+    "document_type": "payslip_vacation",
+    "pay_period": "2026-08",
+    "name_on_doc": "GABRIELA QUINTANA PINTO",
+    "cpf_on_doc": "814.420.287-26",
+    "total_earnings": 1263.92,
+    "total_deductions": 94.79,
+    "net_pay": 1169.13,
+    "earnings_lines": [
+      {
+        "description": "FÉRIAS (10 DIAS)",
+        "amount": 947.94,
+        "counts_as_income": true
+      },
+      {
+        "description": "1/3 CONSTITUCIONAL DE FÉRIAS",
+        "amount": 315.98,
+        "counts_as_income": false
+      }
+    ],
+    "fraud_suspected": false,
+    "fraud_reason": null,
+    "capture_type": "original_file"
+  }
+}

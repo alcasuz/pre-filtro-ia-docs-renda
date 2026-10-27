@@ -1,0 +1,10 @@
+file,mean_confidence,words,tesseract_version,lang,config
+A01_2026-07_happy-path.jpeg,66.03,63,5.5.3,por,--psm 3
+A13_2026-07_foto-vertical-de-tela-pc.jpeg,55.43,21,5.5.3,por,--psm 3
+A15_2026-08_foto-horizontal.jpeg,80.21,73,5.5.3,por,--psm 3
+A15_2026-07_foto-horizontal.jpeg,77.08,49,5.5.3,por,--psm 3
+A15_2026-09_foto-vertical-sem-cortar.jpeg,51.83,24,5.5.3,por,--psm 3
+N14_2026-07_inclinado.jpeg,41.0,1,5.5.3,por,--psm 3
+N14_2026-08_foto-com-flash.jpeg,85.79,33,5.5.3,por,--psm 3
+N14_2026-09_cortado.jpeg,66.39,41,5.5.3,por,--psm 3
+A10_2026-08_ferias_tremido.jpeg,37.25,8,5.5.3,por,--psm 3

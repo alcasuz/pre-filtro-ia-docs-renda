@@ -27,4 +27,5 @@ def documento_da_extracao(file, extracao, ocr_confidence=None):
         fraud_suspected=bool(extracao["fraud_suspected"]),
         fraud_reason=extracao["fraud_reason"],
         ocr_confidence=ocr_confidence,
+        capture_type=extracao.get("capture_type"),
     )

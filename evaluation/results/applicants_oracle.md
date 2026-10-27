@@ -7,7 +7,7 @@ Gerado por `evaluation/score_applicants.py`, sem chamadas à API. Configuração
 ```
 Fonte: oracle (gabarito) | config v1 | clientes: 32
 Decisão certa: 32/32 (100.0%) | motivo principal certo: 32/32 (100.0%)
-Acerto por classe: approve 16/16 (100.0%) | reject 12/12 (100.0%) | review 4/4 (100.0%)
+Acerto por classe: approve 16/16 (100.0%) | reject 13/13 (100.0%) | review 3/3 (100.0%)
 Falso negativo (deveria aprovar, foi reprovado): 0/16 (0.0%)
 Renda válida diferente do gabarito (> R$ 0,01): 0 de 30 comparáveis
 Clientes com decisão ou motivo errado: 0
@@ -20,8 +20,8 @@ Linhas: gabarito. Colunas: motor.
 | gabarito \ obtido | approve | reject | review |
 |---|---|---|---|
 | approve | 16 | 0 | 0 |
-| reject | 0 | 12 | 0 |
-| review | 0 | 0 | 4 |
+| reject | 0 | 13 | 0 |
+| review | 0 | 0 | 3 |
 
 ## Clientes errados (decisão ou motivo principal)
 
@@ -63,7 +63,7 @@ Comparáveis: 30; diferentes do gabarito (> R$ 0,01): 0.
 | N10 | reject | reject | insufficient_income | insufficient_income | 3378.50 | 3378.50 | não |
 | N11 | reject | reject | insufficient_income | insufficient_income | 1898.73 | 1898.73 | não |
 | N12 | reject | reject | illegible | illegible | 2808.93 | 2808.93 | não |
-| N13 | review | review | suspected_fraud | suspected_fraud | 5031.00 | 5031.00 | sim |
+| N13 | reject | reject | screen_capture | screen_capture | 5031.00 | 5031.00 | não |
 | N14 | review | review | name_review | name_review | 1930.04 | 1930.04 | não |
 | N15 | review | review | suspected_fraud | suspected_fraud | 2802.60 | 2802.60 | sim |
 | N16 | review | review | suspected_fraud | suspected_fraud | 5856.06 | 5856.06 | sim |

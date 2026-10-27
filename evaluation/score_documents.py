@@ -10,8 +10,11 @@ Regras de comparação:
   pede a cópia literal; campo vazio no gabarito equivale a null;
 - valores: iguais ao centavo (R$ 0,01);
 - document_type: bank_statement e other contam como "other" (tipos da R1);
-- fraud_suspected: o esperado é true só quando degradation = screenshot ou
-  extra_text está preenchido;
+- fraud_suspected: o esperado é true quando extra_text está preenchido; até o
+  prompt v2, também quando degradation = screenshot (no v3, print não é fraude);
+- capture_type (prompt v3 em diante): o esperado vem da degradation
+  (screenshot -> screenshot; skewed e blurred, fotos simuladas -> photo_of_paper;
+  none -> original_file); fica fora da acurácia por campo, numa matriz própria;
 - documentos com degradation = blurred ficam fora de todas as métricas de
   extração e aparecem num bloco separado; a ilegibilidade é decidida pelo OCR
   (R7), não pelo LLM.
@@ -37,6 +40,28 @@ TIPO_NO_EVAL = {"payslip": "payslip", "payslip_vacation": "payslip_vacation",
                 "payslip_13th": "payslip_13th", "bank_statement": "other", "other": "other"}
 CAMPOS_TEXTO = ["pay_period", "name_on_doc", "cpf_on_doc"]
 CAMPOS_VALOR = ["total_earnings", "total_deductions", "net_pay"]
+TIPOS_CAPTURA = ["original_file", "photo_of_paper", "photo_of_screen", "screenshot"]
+CAPTURA_POR_DEGRADACAO = {"screenshot": "screenshot", "skewed": "photo_of_paper", "blurred": "photo_of_paper"}
+# Até o v2, o prompt pedia fraud_suspected também para print de tela.
+PROMPTS_PRINT_E_FRAUDE = {"extraction_v1", "extraction_v2"}
+
+
+def captura_esperada(doc):
+    return CAPTURA_POR_DEGRADACAO.get(doc["degradation"], "original_file")
+
+
+def fraude_esperada(doc, versao):
+    return bool(doc["extra_text"]) or (versao in PROMPTS_PRINT_E_FRAUDE and doc["degradation"] == "screenshot")
+
+
+def tabela_captura(matriz):
+    """Matriz de confusão do capture_type em markdown; matriz é um Counter de (esperado, obtido)."""
+    obtidos = TIPOS_CAPTURA + sorted({o for _, o in matriz} - set(TIPOS_CAPTURA))
+    md = ["| gabarito \\ extraído | " + " | ".join(map(str, obtidos)) + " |", "|---" * (len(obtidos) + 1) + "|"]
+    for esperado in TIPOS_CAPTURA:
+        if any(e == esperado for e, _ in matriz):
+            md.append(f"| {esperado} | " + " | ".join(str(matriz[(esperado, o)]) for o in obtidos) + " |")
+    return md
 
 
 def ler_csv(caminho):
@@ -185,7 +210,7 @@ def avaliar(versao, modelo):
     fraude = {"acertos": 0, "alarmes_falsos": [], "nao_detectadas": [], "detectadas": [], "total": 0}
     for doc in avaliados:
         e = extracoes[doc["file"]]
-        esperado = doc["degradation"] == "screenshot" or bool(doc["extra_text"])
+        esperado = fraude_esperada(doc, versao)
         fraude["total"] += 1
         if e["fraud_suspected"] == esperado:
             fraude["acertos"] += 1
@@ -196,6 +221,12 @@ def avaliar(versao, modelo):
         else:
             fraude["nao_detectadas"].append(doc["file"])
     r["fraude"] = fraude
+
+    # Tipo de captura (prompt v3 em diante)
+    captura = Counter((captura_esperada(doc), extracoes[doc["file"]].get("capture_type")) for doc in avaliados)
+    r["captura"] = captura if any(o is not None for _, o in captura) else None
+    r["erros_captura"] = [(doc["file"], captura_esperada(doc), extracoes[doc["file"]].get("capture_type"))
+                          for doc in avaliados if captura_esperada(doc) != extracoes[doc["file"]].get("capture_type")]
 
     # Latência, erros e tokens (log da API)
     log_path = pasta_cache / "_log.csv"
@@ -235,6 +266,11 @@ def linhas_resumo(r):
         f"Fraude: {pct(r['fraude']['acertos'], r['fraude']['total'])} certos | "
         f"detectadas: {len(r['fraude']['detectadas'])} | alarmes falsos: {len(r['fraude']['alarmes_falsos'])} | "
         f"não detectadas: {len(r['fraude']['nao_detectadas'])}",
+    ]
+    if r["captura"]:
+        certos = sum(n for (e, o), n in r["captura"].items() if e == o)
+        linhas.append(f"capture_type: {pct(certos, sum(r['captura'].values()))} certos")
+    linhas += [
         "",
         f"API: {a['chamadas']} chamadas | taxa de erro: {pct(erros_api, a['chamadas'])} "
         f"({', '.join(f'{k}: {v}' for k, v in sorted(a['status'].items()))})",
@@ -301,7 +337,9 @@ def relatorio_md(r):
 
     f = r["fraude"]
     md += ["## Suspeita de fraude", "",
-           "Esperado true só quando degradation = screenshot ou extra_text está preenchido.", "",
+           "Esperado true quando extra_text está preenchido"
+           + (" ou degradation = screenshot." if r["versao"] in PROMPTS_PRINT_E_FRAUDE
+              else " (no v3, print de tela não é fraude)."), "",
            f"- Acertos: {pct(f['acertos'], f['total'])}",
            f"- Fraudes detectadas: {len(f['detectadas'])}",
            f"- Alarmes falsos: {len(f['alarmes_falsos'])}",
@@ -313,6 +351,15 @@ def relatorio_md(r):
             md.append("")
     if f["nao_detectadas"]:
         md += ["**Não detectadas:** " + ", ".join(f["nao_detectadas"]), ""]
+
+    if r["captura"]:
+        md += ["## Matriz de confusão do capture_type", "",
+               "Linhas: gabarito (pela degradation: screenshot -> screenshot; skewed e blurred -> photo_of_paper; "
+               "none -> original_file). Colunas: extraído.", ""] + tabela_captura(r["captura"]) + [""]
+        if r["erros_captura"]:
+            md += ["**Erros em `capture_type`**", "", "| Arquivo | Gabarito | Extraído |", "|---|---|---|"]
+            md += [f"| {f} | {g} | {fmt(x)} |" for f, g, x in r["erros_captura"]]
+            md.append("")
 
     md += ["## Documentos desfocados (fora das métricas)", "",
            "O gabarito desses documentos não é legível; a decisão de ilegibilidade é do OCR (R7). "

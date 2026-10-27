@@ -3,6 +3,8 @@
 O sinal é a confiança média das palavras no OCR (core/ocr.py): abaixo de
 legibility_min_confidence, o documento é ilegível; no limite exato, é legível.
 Sem confiança de OCR (o OCR não conseguiu ler) também é falha de legibilidade.
+Um CPF lido com dígitos verificadores inválidos também (R2): é sinal de leitura
+errada, não de outro titular, então não vira cpf_mismatch.
 
 Fallback, no nível do pedido: falhas_anteriores é quantas reprovações por
 ilegibilidade o pedido já teve (informado por quem chama o motor). Se esta é a
@@ -12,6 +14,7 @@ imagem legível não ficar preso.
 """
 
 from ..models import PASS, REJECT, REVIEW, ResultadoRegra
+from .identification import cpf_valido, normalizar_cpf
 
 
 def avaliar(doc, config, falhas_anteriores=0):
@@ -22,6 +25,9 @@ def avaliar(doc, config, falhas_anteriores=0):
         legivel, detalhes["criterion"] = False, "ocr_unavailable"
     else:
         legivel, detalhes["criterion"] = doc.ocr_confidence >= config.legibility_min_confidence, "ocr_confidence"
+    cpf = normalizar_cpf(doc.cpf_on_doc)
+    if legivel and cpf and not cpf_valido(cpf):
+        legivel, detalhes["criterion"] = False, "cpf_check_digits"
 
     if legivel:
         status, motivo = PASS, None

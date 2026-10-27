@@ -6,7 +6,8 @@ from decimal import Decimal
 import pytest
 
 from core.models import PASS, REJECT, REVIEW, Linha
-from core.rules import consistency, document_type, fraud, identification, income, legibility, time_window
+from core.rules import (consistency, document_type, fraud, identification, income, legibility, screen_capture,
+                        time_window)
 from core.rules.name_similarity import normalizar, similaridade
 
 from .helpers import CONFIG, CPF, cliente, d, documento_vazio, holerite, tres_meses
@@ -76,6 +77,24 @@ def test_numero_de_tentativas_vem_da_configuracao():
     assert r.reason == "illegible"
 
 
+@pytest.mark.parametrize("cpf_doc", ["816.425.287-26", "782.943.622-38", "782.943.622", "111.111.111-11"])
+def test_cpf_com_digitos_invalidos_e_ilegivel(cpf_doc):
+    # Leitura errada do CPF (ex.: foto tremida), não outro titular: OCR alto não salva.
+    r = legibility.avaliar(holerite(cpf=cpf_doc, ocr=88.0), CONFIG)
+    assert (r.status, r.reason, r.details["criterion"]) == (REJECT, "illegible", "cpf_check_digits")
+
+
+@pytest.mark.parametrize("cpf_doc", ["782.943.622-39", "529.982.247-25", None, ""])
+def test_cpf_valido_ou_ausente_nao_afeta_a_legibilidade(cpf_doc):
+    # Um CPF válido de outra pessoa é cpf_mismatch (R2), não ilegível.
+    assert legibility.avaliar(holerite(cpf=cpf_doc), CONFIG).status == PASS
+
+
+def test_cpf_invalido_tambem_usa_o_fallback_de_tentativas():
+    r = legibility.avaliar(holerite(cpf="782.943.622-38"), CONFIG, 2)
+    assert (r.status, r.reason) == (REVIEW, "too_many_attempts")
+
+
 # ---------------------------------------------------------------------------
 # R1: tipo de documento
 # ---------------------------------------------------------------------------
@@ -94,6 +113,27 @@ def test_tipo_extrato_extra_junto_com_holerites_e_ignorado():
 @pytest.mark.parametrize("tipo", ["payslip", "payslip_vacation", "payslip_13th"])
 def test_tipos_aceitos(tipo):
     assert document_type.avaliar([holerite(tipo=tipo)]).status == PASS
+
+
+# ---------------------------------------------------------------------------
+# R1: captura de tela
+# ---------------------------------------------------------------------------
+
+@pytest.mark.parametrize("captura, status, motivo", [
+    ("original_file", PASS, None),
+    ("photo_of_paper", PASS, None),
+    ("photo_of_screen", REJECT, "screen_capture"),
+    ("screenshot", REJECT, "screen_capture"),
+])
+def test_captura_de_tela_reprova(captura, status, motivo):
+    r = screen_capture.avaliar(holerite(captura=captura))
+    assert (r.status, r.reason, r.details["capture_type"]) == (status, motivo, captura)
+
+
+def test_extracao_sem_capture_type_nao_e_avaliada():
+    # Extrações dos prompts v1 e v2 não têm o campo.
+    r = screen_capture.avaliar(holerite(captura=None))
+    assert (r.status, r.details["evaluated"]) == (PASS, False)
 
 
 # ---------------------------------------------------------------------------
@@ -320,12 +360,12 @@ def test_consistencia_com_total_ausente_nao_e_avaliada():
 
 
 # ---------------------------------------------------------------------------
-# Fraude (R1 print + R7 injection)
+# Fraude (R7: injection ou sinais de edição)
 # ---------------------------------------------------------------------------
 
 def test_fraude_sinalizada_vai_para_revisao():
-    r = fraud.avaliar(holerite(fraude=True, motivo_fraude="captura de tela"))
-    assert (r.status, r.reason, r.details["fraud_reason"]) == (REVIEW, "suspected_fraud", "captura de tela")
+    r = fraud.avaliar(holerite(fraude=True, motivo_fraude="texto pedindo aprovação"))
+    assert (r.status, r.reason, r.details["fraud_reason"]) == (REVIEW, "suspected_fraud", "texto pedindo aprovação")
 
 
 def test_sem_fraude_passa():

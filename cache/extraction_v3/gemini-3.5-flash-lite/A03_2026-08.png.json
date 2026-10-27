@@ -1,0 +1,25 @@
+{
+  "file": "A03_2026-08.png",
+  "model": "gemini-3.5-flash-lite",
+  "prompt_version": "extraction_v3",
+  "prompt_sha256": "2b395d00950b13735b188b537f86ff132afd14558d7f6c294da2ae570e86d09f",
+  "extraction": {
+    "document_type": "payslip",
+    "pay_period": "2026-08",
+    "name_on_doc": "WAGNER CARDOSO FALCÃO",
+    "cpf_on_doc": "778.643.926-95",
+    "total_earnings": 1823.28,
+    "total_deductions": 141.33,
+    "net_pay": 1681.95,
+    "earnings_lines": [
+      {
+        "description": "SALÁRIO BASE",
+        "amount": 1823.28,
+        "counts_as_income": true
+      }
+    ],
+    "fraud_suspected": false,
+    "fraud_reason": null,
+    "capture_type": "original_file"
+  }
+}

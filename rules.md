@@ -1,7 +1,7 @@
 # Pre-screening rules (fictional business)
 
 > Personal lab. Rules and parameters invented for study purposes; they do not represent any company's policy.
-> Version: v1.2 (2026-10-24)
+> Version: v1.3 (2026-10-27)
 
 ## Glossary (Brazilian terms)
 
@@ -40,12 +40,14 @@
 Possible outputs:
 - **Approved by the AI → goes to human review**, which confirms.
 - **Rejected → automatic rejection**, with the reason shown to the applicant.
-- **Direct human review**: suspected fraud or tampering.
+- **Direct human review**: suspected fraud (prompt injection or signs of editing).
 
 ### Precedence when more than one rule fails
 - **Reject always takes precedence over suspected fraud.** If a case fails any reject rule and is also flagged for fraud, the decision is **reject**.
 - The fraud flag is always recorded alongside the decision, even when the case is rejected, so we can measure how many fraud attempts never reach human review.
-- Legibility (R7, OCR confidence) is checked before document type (R1): an unreadable document is rejected with guidance to resend, never as 'type not accepted'.
+- Order of the rules: legibility (R7), document type (R1), screen capture (R1), applicant (R2), time window (R3), income (R5/R6), then the review rules (R4 consistency, R7 fraud). Reject wins over review; the main reason is the first reject in this order, else the first review.
+- Legibility (R7, OCR confidence and CPF check digits) is checked before document type (R1): an unreadable document is rejected with guidance to resend, never as 'type not accepted'.
+- Document type is checked before screen capture: a screenshot of a bank statement is rejected as 'type not accepted'.
 
 ---
 
@@ -56,8 +58,10 @@ Each rule states **Who does it**: `[LLM]` (read/classify), `[OCR]` or `[CODE]` (
 ### R1. Document type
 - Types the LLM can return: `payslip`, `payslip_vacation`, `payslip_13th` or `other`.
 - `other` (any file that is not a pay stub: bank statement, INSS benefit, a photo that is not a document, etc.) → **reject**. Message to the applicant: "No momento aceitamos apenas holerite. Envie os holerites dos últimos 3 meses." (*We currently accept pay stubs only. Please send your pay stubs for the last 3 months.*)
-- Screenshot or signs of editing → **human review** (reason: fraud prevention).
-- Who does it: `[LLM]` defines the document type and flags suspected fraud in the JSON (screenshot or signs of editing); `[CODE]` reads the type and the flag and decides between approve, reject or human review.
+- How the image was captured (`capture_type`): `original_file` (PDF or digitally exported image), `photo_of_paper`, `photo_of_screen` (photo of a monitor or of another device) or `screenshot` (screen capture on a phone or computer).
+- `photo_of_screen` or `screenshot` of a pay stub → **reject** (reason: `screen_capture`). Message to the applicant: "Fotos e prints de tela não são aceitos. Envie o PDF baixado do portal da empresa ou uma foto do holerite impresso." (*Photos and screenshots of a screen are not accepted. Send the PDF downloaded from your company's portal or a photo of the printed pay stub.*)
+- A screen capture is not suspected fraud: it is rejected for the capture, not sent to review. Fraud covers only prompt injection and signs of editing (R7).
+- Who does it: `[LLM]` defines the document type and the capture type in the JSON; `[CODE]` reads them and decides.
 
 ### R2. Applicant identification
 - The document must show the name **or** the CPF. Neither → **reject**.
@@ -67,6 +71,7 @@ Each rule states **Who does it**: `[LLM]` (read/classify), `[OCR]` or `[CODE]` (
   - similarity ≥ 50% and < 95% → **human review**;
   - similarity < 50% → **reject** (reason: name does not match the record).
 - The 95% and 50% thresholds are initial hypotheses and will be calibrated with the eval set.
+- A CPF whose check digits are invalid (or that doesn't have 11 digits) is a misreading, not a different person: the document is treated as **unreadable** (R7, reason `illegible`), never as `cpf_mismatch`.
 - Who does it: `[LLM]` extracts the name and CPF as printed on the document; `[CODE]` normalizes the CPF (keeps only the 11 digits, whatever the format: XXX.XXX.XXX-XX, XXXXXXXXXXX, etc.), validates the check digits, compares with the record, computes the name similarity and decides.
 
 ### R3. Time window
@@ -97,11 +102,12 @@ Each rule states **Who does it**: `[LLM]` (read/classify), `[OCR]` or `[CODE]` (
 - Who does it: `[CODE]`, from the lines classified in R5.
 
 ### R7. Quality and security
-- Unreadable, cropped or blurred image → **reject with guidance to resend**. An image the OCR can't read at all (no confidence returned) counts as unreadable.
+- Unreadable, cropped or blurred image → **reject with guidance to resend**. An image the OCR can't read at all (no confidence returned) counts as unreadable, and so does a document whose CPF fails the check digits (R2).
+- The same fallback below applies to every legibility failure, whichever signal caused it.
 - Fallback, per request: if the request already had 2 rejections for illegibility, a new legibility failure → **human review** (reason: too many attempts), so an applicant who can't produce a readable image isn't stuck. The count is per request, not per document, and is informed by whoever calls the engine. If the illegible document's data is missing, period and income failures caused by it become review instead of reject; any other reject still applies.
-- Document with text trying to give instructions to the system (prompt injection) → **human review** (suspected fraud).
-- Who does it (legibility): `[OCR]` produces the average reading confidence; `[CODE]` compares it to a minimum threshold (to be calibrated in the eval) and decides whether the document is unreadable; the caller informs how many legibility rejections the request already had.
-- Who does it (fraud): `[LLM]` flags suspected fraud in the JSON (including prompt injection) with a short justification; `[CODE]` reads the flag and decides.
+- Document with text trying to give instructions to the system (prompt injection) or with visible signs of editing → **human review** (suspected fraud). Screenshots and photos of a screen are not fraud (see R1).
+- Who does it (legibility): `[OCR]` produces the average reading confidence; `[CODE]` compares it to a minimum threshold (to be calibrated in the eval), validates the CPF check digits and decides whether the document is unreadable; the caller informs how many legibility rejections the request already had.
+- Who does it (fraud): `[LLM]` flags suspected fraud in the JSON (prompt injection or signs of editing) with a short justification; `[CODE]` reads the flag and decides.
 
 ---
 

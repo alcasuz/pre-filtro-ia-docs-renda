@@ -1,4 +1,7 @@
-"""R1 (print/edição) + R7 (prompt injection): a sinalização de fraude do LLM leva à revisão."""
+"""R7 (sinais de edição ou prompt injection): a sinalização de fraude do LLM leva à revisão.
+
+Print e foto de tela não são fraude: são avaliados pela regra screen_capture (R1).
+"""
 
 from ..models import PASS, REVIEW, ResultadoRegra
 

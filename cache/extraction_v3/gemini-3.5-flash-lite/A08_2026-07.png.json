@@ -1,0 +1,25 @@
+{
+  "file": "A08_2026-07.png",
+  "model": "gemini-3.5-flash-lite",
+  "prompt_version": "extraction_v3",
+  "prompt_sha256": "2b395d00950b13735b188b537f86ff132afd14558d7f6c294da2ae570e86d09f",
+  "extraction": {
+    "document_type": "payslip",
+    "pay_period": "2026-07",
+    "name_on_doc": "MARCOS CONCEICAO REZENDE",
+    "cpf_on_doc": null,
+    "total_earnings": 4867.52,
+    "total_deductions": 1092.32,
+    "net_pay": 3775.2,
+    "earnings_lines": [
+      {
+        "description": "SALÁRIO BASE",
+        "amount": 4867.52,
+        "counts_as_income": true
+      }
+    ],
+    "fraud_suspected": false,
+    "fraud_reason": null,
+    "capture_type": "original_file"
+  }
+}

@@ -103,3 +103,66 @@ def test_documento_escalado_nao_salva_outra_reprovacao():
 
 def test_falhas_anteriores_nao_afetam_pedido_legivel():
     assert decidir(cliente(), tres_meses(), CONFIG, prior_legibility_failures=2).decision == "approve"
+
+
+# ---------------------------------------------------------------------------
+# Captura de tela (R1) e CPF inválido (R2 -> R7)
+# ---------------------------------------------------------------------------
+
+def test_print_de_holerite_reprova_por_captura_de_tela():
+    # N13: um dos três holerites é print do portal.
+    docs = tres_meses()
+    docs[2] = holerite(periodo="2026-09", captura="screenshot")
+    r = decidir(cliente(), docs, CONFIG)
+    assert (r.decision, r.main_reason, r.reasons) == (REJECT, "screen_capture", ["screen_capture"])
+    assert r.fraud_flag is False
+
+
+def test_foto_de_tela_reprova_por_captura_de_tela():
+    r = decidir(cliente(), tres_meses(captura="photo_of_screen"), CONFIG)
+    assert (r.decision, r.main_reason) == (REJECT, "screen_capture")
+
+
+def test_print_de_extrato_reprova_por_tipo_e_nao_por_captura():
+    extrato = holerite(tipo="other", periodo="2026-09", arquivo="T01_extrato.png", linhas=[], captura="screenshot")
+    r = decidir(cliente(), [extrato], CONFIG)
+    assert (r.decision, r.main_reason, r.reasons) == (REJECT, "type_not_accepted", ["type_not_accepted"])
+
+
+def test_print_de_extrato_extra_junto_com_holerites_e_ignorado():
+    extrato = holerite(tipo="other", periodo="2026-09", arquivo="T01_extrato.png", linhas=[], captura="screenshot")
+    assert decidir(cliente(), tres_meses() + [extrato], CONFIG).decision == APPROVE
+
+
+def test_legibilidade_vem_antes_da_captura_de_tela():
+    docs = tres_meses(captura="screenshot")
+    docs[0] = holerite(periodo="2026-07", captura="screenshot", ocr=10.0)
+    r = decidir(cliente(), docs, CONFIG)
+    assert r.main_reason == "illegible" and r.reasons[:2] == ["illegible", "screen_capture"]
+
+
+def test_captura_de_tela_vem_antes_do_titular():
+    r = decidir(cliente(), tres_meses(captura="screenshot", cpf="529.982.247-25"), CONFIG)
+    assert r.main_reason == "screen_capture" and r.reasons[:2] == ["screen_capture", "cpf_mismatch"]
+
+
+def test_captura_de_tela_vence_revisao_e_a_fraude_fica_registrada():
+    docs = tres_meses(captura="screenshot")
+    docs[1] = holerite(periodo="2026-08", captura="screenshot", fraude=True, motivo_fraude="injection")
+    r = decidir(cliente(), docs, CONFIG)
+    assert (r.decision, r.main_reason) == (REJECT, "screen_capture")
+    assert r.fraud_flag is True and "suspected_fraud" in r.reasons
+
+
+def test_cpf_com_digitos_invalidos_reprova_como_ilegivel_e_nao_como_cpf_divergente():
+    # A10 na foto tremida: o LLM leu 816.425.287-26, que não tem dígitos verificadores válidos.
+    docs = tres_meses()
+    docs[1] = holerite(periodo="2026-08", cpf="816.425.287-26")
+    r = decidir(cliente(), docs, CONFIG)
+    assert (r.decision, r.main_reason) == (REJECT, "illegible")
+    assert "cpf_mismatch" not in r.reasons
+
+
+def test_cpf_valido_de_outra_pessoa_continua_cpf_divergente():
+    r = decidir(cliente(), tres_meses(cpf="529.982.247-25"), CONFIG)
+    assert (r.decision, r.main_reason) == (REJECT, "cpf_mismatch")

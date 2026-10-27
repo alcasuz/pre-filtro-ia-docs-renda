@@ -1,0 +1,10 @@
+executed_at,file,model,prompt_version,status,input_tokens,output_tokens,thought_tokens,total_tokens,latency_s,error
+2026-10-27T03:15:38+00:00,A01_2026-07_happy-path.jpeg,gemini-3.5-flash-lite,extraction_v2,ok,1800,224,0,2024,4.918,
+2026-10-27T03:15:43+00:00,A13_2026-07_foto-vertical-de-tela-pc.jpeg,gemini-3.5-flash-lite,extraction_v2,ok,1808,280,0,2088,2.783,
+2026-10-27T03:15:47+00:00,A15_2026-08_foto-horizontal.jpeg,gemini-3.5-flash-lite,extraction_v2,ok,1793,224,0,2017,2.848,
+2026-10-27T03:15:51+00:00,A15_2026-07_foto-horizontal.jpeg,gemini-3.5-flash-lite,extraction_v2,ok,1808,219,0,2027,3.556,
+2026-10-27T03:15:55+00:00,A15_2026-09_foto-vertical-sem-cortar.jpeg,gemini-3.5-flash-lite,extraction_v2,ok,1808,196,0,2004,3.21,
+2026-10-27T03:15:59+00:00,N14_2026-07_inclinado.jpeg,gemini-3.5-flash-lite,extraction_v2,ok,1808,210,0,2018,2.791,
+2026-10-27T03:16:03+00:00,N14_2026-08_foto-com-flash.jpeg,gemini-3.5-flash-lite,extraction_v2,ok,1808,192,0,2000,2.699,
+2026-10-27T03:16:07+00:00,N14_2026-09_cortado.jpeg,gemini-3.5-flash-lite,extraction_v2,ok,1808,203,0,2011,2.679,
+2026-10-27T03:16:11+00:00,A10_2026-08_ferias_tremido.jpeg,gemini-3.5-flash-lite,extraction_v2,ok,1808,246,0,2054,2.152,
