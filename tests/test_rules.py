@@ -6,8 +6,8 @@ from decimal import Decimal
 import pytest
 
 from core.models import PASS, REJECT, REVIEW, Linha
-from core.rules import (consistency, document_type, fraud, identification, income, legibility, screen_capture,
-                        time_window)
+from core.rules import (completeness, consistency, document_type, fraud, identification, income, legibility,
+                        screen_capture, time_window)
 from core.rules.name_similarity import normalizar, similaridade
 
 from .helpers import CONFIG, CPF, cliente, d, documento_vazio, holerite, tres_meses
@@ -134,6 +134,49 @@ def test_extracao_sem_capture_type_nao_e_avaliada():
     # Extrações dos prompts v1 e v2 não têm o campo.
     r = screen_capture.avaliar(holerite(captura=None))
     assert (r.status, r.details["evaluated"]) == (PASS, False)
+
+
+# ---------------------------------------------------------------------------
+# Documento incompleto
+# ---------------------------------------------------------------------------
+
+def test_holerite_completo_passa():
+    assert completeness.avaliar(holerite(), CONFIG).status == PASS
+
+
+@pytest.mark.parametrize("faltando, kwargs", [
+    ("pay_period", {"periodo": None}),
+    ("total_earnings", {"totais": (None, "250.00", "2750.00")}),
+    ("total_deductions", {"totais": ("3000.00", None, "2750.00")}),
+    ("net_pay", {"totais": ("3000.00", "250.00", None)}),
+    ("earnings_lines", {"linhas": []}),
+])
+def test_cada_campo_obrigatorio_faltando_reprova(faltando, kwargs):
+    r = completeness.avaliar(holerite(**kwargs), CONFIG)
+    assert (r.status, r.reason, r.details["missing"]) == (REJECT, "incomplete_document", [faltando])
+
+
+def test_competencia_vazia_conta_como_faltando():
+    assert completeness.avaliar(holerite(periodo=""), CONFIG).reason == "incomplete_document"
+
+
+def test_nome_e_cpf_ausentes_nao_sao_desta_regra():
+    assert completeness.avaliar(holerite(nome=None, cpf=None), CONFIG).status == PASS
+
+
+def test_lista_todos_os_campos_faltando():
+    r = completeness.avaliar(holerite(totais=(None, None, None), linhas=[]), CONFIG)
+    assert r.details["missing"] == ["total_earnings", "total_deductions", "net_pay", "earnings_lines"]
+
+
+@pytest.mark.parametrize("falhas_anteriores, status, motivo", [
+    (0, REJECT, "incomplete_document"),
+    (1, REJECT, "incomplete_document"),
+    (2, REVIEW, "too_many_attempts"),
+])
+def test_incompleto_usa_o_contador_de_tentativas(falhas_anteriores, status, motivo):
+    r = completeness.avaliar(holerite(linhas=[]), CONFIG, falhas_anteriores)
+    assert (r.status, r.reason) == (status, motivo)
 
 
 # ---------------------------------------------------------------------------

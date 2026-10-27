@@ -15,6 +15,8 @@ Regras de comparação:
 - capture_type (prompt v3 em diante): o esperado vem da degradation
   (screenshot -> screenshot; skewed e blurred, fotos simuladas -> photo_of_paper;
   none -> original_file); fica fora da acurácia por campo, numa matriz própria;
+- só holerites (payslip*) entram na acurácia por campo, nas linhas, na fraude e
+  no capture_type; documentos de outro tipo são avaliados só pelo document_type;
 - documentos com degradation = blurred ficam fora de todas as métricas de
   extração e aparecem num bloco separado; a ilegibilidade é decidida pelo OCR
   (R7), não pelo LLM.
@@ -150,7 +152,9 @@ def avaliar(versao, modelo):
     desfocados = [d for d in documentos if d["file"] in extracoes and d["degradation"] == "blurred"]
     sem_extracao = [d["file"] for d in documentos if d["file"] not in extracoes]
 
+    holerites = [d for d in avaliados if d["true_type"].startswith("payslip")]
     r = {"versao": versao, "modelo": modelo, "total_docs": len(documentos), "avaliados": len(avaliados),
+         "holerites": len(holerites),
          "desfocados": desfocados, "sem_extracao": sem_extracao, "extracoes": extracoes}
 
     # Acurácia por campo e campos inventados
@@ -164,6 +168,8 @@ def avaliar(versao, modelo):
             acertos["document_type"] += 1
         else:
             erros["document_type"].append((doc["file"], esperado_tipo, e["document_type"]))
+        if doc not in holerites:
+            continue  # outro tipo: avaliado só pelo document_type
         for campo in CAMPOS_TEXTO + CAMPOS_VALOR:
             if campo in CAMPOS_VALOR:
                 esperado, obtido = centavos(doc[campo]), centavos(e[campo])
@@ -182,9 +188,7 @@ def avaliar(versao, modelo):
     # Linhas de provento (só documentos do tipo holerite)
     total_gab = casadas = conta_ok = valor_ok = descricao_exata = 0
     puladas, inventadas, conta_erradas, valor_errado = [], [], [], []
-    for doc in avaliados:
-        if not doc["true_type"].startswith("payslip"):
-            continue
+    for doc in holerites:
         e = extracoes[doc["file"]]
         pares, pul, inv = casar_linhas(proventos[doc["file"]], e["earnings_lines"])
         total_gab += len(proventos[doc["file"]])
@@ -208,7 +212,7 @@ def avaliar(versao, modelo):
 
     # Fraude
     fraude = {"acertos": 0, "alarmes_falsos": [], "nao_detectadas": [], "detectadas": [], "total": 0}
-    for doc in avaliados:
+    for doc in holerites:
         e = extracoes[doc["file"]]
         esperado = fraude_esperada(doc, versao)
         fraude["total"] += 1
@@ -223,10 +227,10 @@ def avaliar(versao, modelo):
     r["fraude"] = fraude
 
     # Tipo de captura (prompt v3 em diante)
-    captura = Counter((captura_esperada(doc), extracoes[doc["file"]].get("capture_type")) for doc in avaliados)
+    captura = Counter((captura_esperada(doc), extracoes[doc["file"]].get("capture_type")) for doc in holerites)
     r["captura"] = captura if any(o is not None for _, o in captura) else None
     r["erros_captura"] = [(doc["file"], captura_esperada(doc), extracoes[doc["file"]].get("capture_type"))
-                          for doc in avaliados if captura_esperada(doc) != extracoes[doc["file"]].get("capture_type")]
+                          for doc in holerites if captura_esperada(doc) != extracoes[doc["file"]].get("capture_type")]
 
     # Latência, erros e tokens (log da API)
     log_path = pasta_cache / "_log.csv"
@@ -249,12 +253,13 @@ def linhas_resumo(r):
     erros_api = a["chamadas"] - a["status"]["ok"]
     linhas = [
         f"Prompt: {r['versao']} | modelo: {r['modelo']} | documentos extraídos: {len(r['extracoes'])}/{r['total_docs']}"
-        f" | avaliados (sem os desfocados): {r['avaliados']}",
+        f" | avaliados (sem os desfocados): {r['avaliados']}, dos quais holerites: {r['holerites']}",
         "",
         "Acurácia por campo:",
     ]
     for campo in ["document_type"] + CAMPOS_TEXTO + CAMPOS_VALOR:
-        linhas.append(f"  {campo:18} {pct(r['acertos'][campo], r['avaliados'])}")
+        base = r["avaliados"] if campo == "document_type" else r["holerites"]
+        linhas.append(f"  {campo:18} {pct(r['acertos'][campo], base)}")
     l = r["linhas"]
     linhas += [
         "",
@@ -289,10 +294,12 @@ def relatorio_md(r):
           "## Resumo", "", "```", *linhas_resumo(r), "```", ""]
 
     md += ["## Acurácia por campo", "",
-           f"Base: {r['avaliados']} documentos (desfocados fora). Textos comparados exatamente como impressos; "
+           f"Base: document_type em {r['avaliados']} documentos (desfocados fora); demais campos só nos "
+           f"{r['holerites']} holerites. Textos comparados exatamente como impressos; "
            "valores ao centavo.", "", "| Campo | Acertos | Erros |", "|---|---|---|"]
     for campo in ["document_type"] + CAMPOS_TEXTO + CAMPOS_VALOR:
-        md.append(f"| {campo} | {pct(r['acertos'][campo], r['avaliados'])} | {len(r['erros'][campo])} |")
+        base = r["avaliados"] if campo == "document_type" else r["holerites"]
+        md.append(f"| {campo} | {pct(r['acertos'][campo], base)} | {len(r['erros'][campo])} |")
     md.append("")
     for campo in ["document_type"] + CAMPOS_TEXTO + CAMPOS_VALOR:
         if r["erros"][campo]:

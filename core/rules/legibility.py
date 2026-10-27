@@ -17,8 +17,17 @@ from ..models import PASS, REJECT, REVIEW, ResultadoRegra
 from .identification import cpf_valido, normalizar_cpf
 
 
+def status_da_falha(motivo, config, falhas_anteriores):
+    """Reprova com o motivo ou, a partir da tentativa max_legibility_attempts, vai para revisão.
+
+    O contador é compartilhado com a regra de documento incompleto.
+    """
+    if falhas_anteriores + 1 >= config.max_legibility_attempts:
+        return REVIEW, "too_many_attempts"
+    return REJECT, motivo
+
+
 def avaliar(doc, config, falhas_anteriores=0):
-    tentativa = falhas_anteriores + 1
     detalhes = {"ocr_confidence": doc.ocr_confidence, "min_confidence": config.legibility_min_confidence,
                 "prior_legibility_failures": falhas_anteriores, "max_attempts": config.max_legibility_attempts}
     if doc.ocr_confidence is None:
@@ -29,10 +38,5 @@ def avaliar(doc, config, falhas_anteriores=0):
     if legivel and cpf and not cpf_valido(cpf):
         legivel, detalhes["criterion"] = False, "cpf_check_digits"
 
-    if legivel:
-        status, motivo = PASS, None
-    elif tentativa >= config.max_legibility_attempts:
-        status, motivo = REVIEW, "too_many_attempts"
-    else:
-        status, motivo = REJECT, "illegible"
+    status, motivo = (PASS, None) if legivel else status_da_falha("illegible", config, falhas_anteriores)
     return ResultadoRegra(rule="legibility", file=doc.file, status=status, reason=motivo, details=detalhes)

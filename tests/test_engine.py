@@ -166,3 +166,53 @@ def test_cpf_com_digitos_invalidos_reprova_como_ilegivel_e_nao_como_cpf_divergen
 def test_cpf_valido_de_outra_pessoa_continua_cpf_divergente():
     r = decidir(cliente(), tres_meses(cpf="529.982.247-25"), CONFIG)
     assert (r.decision, r.main_reason) == (REJECT, "cpf_mismatch")
+
+
+# ---------------------------------------------------------------------------
+# Documento incompleto
+# ---------------------------------------------------------------------------
+
+def test_holerite_sem_total_reprova_como_incompleto():
+    docs = tres_meses()
+    docs[2] = holerite(periodo="2026-09", totais=(None, "250.00", "2750.00"))
+    r = decidir(cliente(), docs, CONFIG)
+    assert (r.decision, r.main_reason, r.reasons) == (REJECT, "incomplete_document", ["incomplete_document"])
+
+
+def test_captura_de_tela_vem_antes_do_incompleto():
+    docs = tres_meses(captura="photo_of_screen")
+    docs[0] = holerite(periodo="2026-07", captura="photo_of_screen", linhas=[])
+    r = decidir(cliente(), docs, CONFIG)
+    assert r.main_reason == "screen_capture" and r.reasons[:2] == ["screen_capture", "incomplete_document"]
+
+
+def test_incompleto_vem_antes_do_titular_e_da_renda():
+    docs = tres_meses(cpf="529.982.247-25")
+    docs[0] = holerite(periodo="2026-07", cpf="529.982.247-25", linhas=[])
+    r = decidir(cliente(), docs, CONFIG)
+    assert r.main_reason == "incomplete_document"
+    assert r.reasons[:3] == ["incomplete_document", "cpf_mismatch", "insufficient_income"]
+
+
+def test_ilegivel_vem_antes_do_incompleto():
+    docs = tres_meses()
+    docs[0] = holerite(periodo="2026-07", linhas=[], ocr=10.0)
+    r = decidir(cliente(), docs, CONFIG)
+    assert r.main_reason == "illegible" and "incomplete_document" not in r.reasons
+
+
+def test_contador_compartilhado_incompleto_na_terceira_tentativa_vai_para_revisao():
+    # Duas falhas anteriores (por ilegível ou incompleto): a próxima incompleta vai para revisão,
+    # e a reprovação de período causada pela competência faltante também.
+    docs = tres_meses()
+    docs[2] = holerite(periodo=None, arquivo="T01_sem_competencia.png")
+    r = decidir(cliente(), docs, CONFIG, prior_legibility_failures=2)
+    assert (r.decision, r.main_reason) == (REVIEW, "too_many_attempts")
+    periodo = next(x for x in r.results if x.rule == "time_window")
+    assert periodo.status == REVIEW and periodo.details["incomplete_due_to"] == ["T01_sem_competencia.png"]
+
+
+def test_contador_compartilhado_segunda_tentativa_incompleta_ainda_reprova():
+    docs = tres_meses()
+    docs[2] = holerite(periodo="2026-09", linhas=[])
+    assert decidir(cliente(), docs, CONFIG, prior_legibility_failures=1).main_reason == "incomplete_document"

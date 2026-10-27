@@ -15,12 +15,28 @@ Regras de comparação (as mesmas de score_documents.py):
 - cut_fields: o certo é null; valor preenchido conta como erro e como inventado.
   Para earnings_lines.description, as linhas são casadas pelo valor e toda
   descrição preenchida conta como inventada;
+- só fotos de holerite (payslip*) entram na acurácia por campo e nas linhas;
+  fotos de outro tipo são avaliadas só pelo document_type;
 - partial_fields: o modelo extrai o que aparece e o motor decide; o valor é
   mostrado, mas não conta como acerto, erro ou invenção;
 - fotos com expected_legible = no ficam fora da acurácia, num bloco separado;
 - label_leak = yes (o nome do arquivo aparece na foto) é reportado à parte.
 O porteiro de legibilidade usa cache/ocr/confidence_v2.csv e o limite de
 config/default_rules.yaml, sem alterar nada no motor.
+
+Impacto na decisão: para cada foto, o documento de origem é trocado pela foto
+no cliente dele (os demais documentos vêm do gabarito, como no modo oracle de
+score_applicants.py, para isolar o efeito da foto) e o motor roda com
+prior_legibility_failures = 0. Decisão esperada, derivada dos rótulos e na ordem
+do motor: ilegível -> reject/illegible; cliente sem holerite -> o motivo do
+gabarito (type_not_accepted); foto de tela -> reject/screen_capture; campo
+obrigatório (pay_period ou um dos totais) cortado -> reject/incomplete_document;
+nos demais casos, a decisão do cliente no ground_truth.csv. Se a foto tiver
+expected_decision e expected_reason preenchidos no photos.csv, eles substituem
+os dois últimos passos (campo cortado e gabarito). Uma segunda visão
+repete tudo como se a captura fosse aceita (capture_type = photo_of_paper), para
+medir a leitura sem a regra de captura mascarando o resto. Um campo cortado
+inventado muda a decisão se, com esse campo como null, a decisão for outra.
 
 Uso: .venv/bin/python evaluation/score_photos.py --model gemini-3.5-flash-lite
 """
@@ -37,7 +53,12 @@ sys.path.insert(0, str(RAIZ))
 sys.path.insert(0, str(Path(__file__).resolve().parent))
 
 from core import config as configuracao  # noqa: E402
+from core.engine import decidir  # noqa: E402
+from core.inputs import documento_da_extracao  # noqa: E402
 from core.models import CAPTURAS_DE_TELA  # noqa: E402
+from core.ocr import carregar_confiancas  # noqa: E402
+from core.rules.completeness import CAMPOS_OBRIGATORIOS  # noqa: E402
+from score_applicants import clientes, documentos_oracle  # noqa: E402
 from score_documents import (CAMPOS_TEXTO, CAMPOS_VALOR, PROMPTS_PRINT_E_FRAUDE, TIPO_NO_EVAL,  # noqa: E402
                              casar_linhas, centavos, fmt, pct, percentil, tabela_captura, vazio_para_nulo)
 
@@ -52,13 +73,18 @@ def ler_csv(caminho):
 
 
 def lista(texto):
-    return [c for c in texto.split(";") if c]
+    return [c for c in texto.split(";") if c and c != "none"]
 
 
 def avaliar_foto(foto, doc, proventos, e, prompt):
     """Compara uma extração com o documento de origem, campo a campo e linha a linha."""
     cortados, parciais = set(lista(foto["cut_fields"])), set(lista(foto["partial_fields"]))
     campos, inventados = [], []
+    if not doc["true_type"].startswith("payslip"):
+        esperado = TIPO_NO_EVAL[doc["true_type"]]
+        campos.append({"campo": "document_type", "esperado": esperado, "obtido": e["document_type"],
+                       "ok": esperado == e["document_type"]})
+        return {"campos": campos, "inventados": [], "linhas": [], "puladas": [], "extras": []}
     for campo in CAMPOS:
         if campo in parciais:
             campos.append({"campo": campo, "esperado": "(parcial)", "obtido": e[campo], "ok": None})
@@ -128,6 +154,10 @@ def avaliar(prompt, modelo):
     ocr = {o["file"]: o for o in ler_csv(RAIZ / "cache" / "ocr" / "confidence_v2.csv")}
     log = ler_csv(pasta / "_log.csv") if (pasta / "_log.csv").exists() else []
 
+    docs_oracle, _ = documentos_oracle(carregar_confiancas())
+    cadastro = clientes()
+    gabarito = {g["applicant_id"]: g for g in ler_csv_bom(PASTA_DADOS / "ground_truth.csv")}
+
     resultados = []
     for foto in fotos:
         caminho = pasta / f"{foto['file']}.json"
@@ -135,9 +165,56 @@ def avaliar(prompt, modelo):
         r = {"foto": foto, "extracao": e, "ocr": ocr.get(foto["file"])}
         if e is not None and foto["expected_legible"] == "yes":
             r.update(avaliar_foto(foto, docs[foto["source_file"]], proventos[foto["source_file"]], e, prompt))
+        if e is not None:
+            r["impacto"] = impacto(foto, e, r["ocr"], cfg, docs_oracle, cadastro, gabarito[foto["applicant_id"]],
+                                   docs[foto["source_file"]], r.get("inventados", []))
         resultados.append(r)
     return {"prompt": prompt, "modelo": modelo, "limite": cfg.legibility_min_confidence,
             "resultados": resultados, "log": log}
+
+
+def ler_csv_bom(caminho):
+    with open(caminho, newline="", encoding="utf-8-sig") as f:
+        return list(csv.DictReader(f))
+
+
+def decisao_esperada(foto, g, doc_origem, considerar_captura):
+    if foto["expected_legible"] == "no":
+        return "reject", "illegible"
+    if g["expected_reason"] == "type_not_accepted":
+        return "reject", "type_not_accepted"
+    holerite = doc_origem["true_type"].startswith("payslip")
+    if considerar_captura and holerite and foto["expected_capture_type"] in CAPTURAS_DE_TELA:
+        return "reject", "screen_capture"
+    # Rótulo explícito no photos.csv vale no lugar da derivação, depois das regras que vêm antes.
+    if foto.get("expected_decision"):
+        return foto["expected_decision"], foto.get("expected_reason") or None
+    if holerite and set(lista(foto["cut_fields"])) & set(CAMPOS_OBRIGATORIOS):
+        return "reject", "incomplete_document"
+    return g["expected_decision"], g["expected_reason"] or None
+
+
+def rodar_motor(foto, e, ocr, cfg, docs_oracle, cadastro, captura=None, anular=()):
+    e = dict(e, **{c: None for c in anular})
+    if captura:
+        e["capture_type"] = captura
+    doc = documento_da_extracao(foto["file"], e, float(ocr["mean_confidence"]) if ocr else None)
+    cid = foto["applicant_id"]
+    outros = [d for d in docs_oracle[cid] if d.file != foto["source_file"]]
+    d = decidir(cadastro[cid], outros + [doc], cfg, prior_legibility_failures=0)
+    return d.decision, d.main_reason
+
+
+def impacto(foto, e, ocr, cfg, docs_oracle, cadastro, g, doc_origem, inventados):
+    """Decisão do motor com a foto no lugar do documento de origem, nas duas visões."""
+    visoes = {}
+    for nome, captura in (("com_captura", None), ("sem_captura", "photo_of_paper")):
+        obtida = rodar_motor(foto, e, ocr, cfg, docs_oracle, cadastro, captura)
+        anular = [c for c, _ in inventados if c in CAMPOS_VALOR + CAMPOS_TEXTO]
+        sem_invencao = rodar_motor(foto, e, ocr, cfg, docs_oracle, cadastro, captura, anular) if anular else obtida
+        visoes[nome] = {"esperada": decisao_esperada(foto, g, doc_origem, captura is None), "obtida": obtida,
+                        "sem_invencao": sem_invencao}
+    return visoes
 
 
 def tabela_por_grupo(avaliadas, chave):
@@ -190,6 +267,15 @@ def resumo(r):
         f"latência p50 {fmt(percentil(lat, 50)) if lat else '—'} s, p90 {fmt(percentil(lat, 90)) if lat else '—'} s",
         "Tokens médios por foto: " + " | ".join(f"{k.replace('_tokens', '')} {v:.0f}" for k, v in tokens.items()),
     ]
+    xs = [x for x in r["resultados"] if "impacto" in x]
+    if xs:
+        certas = {n: sum(x["impacto"][n]["esperada"] == x["impacto"][n]["obtida"] for x in xs)
+                  for n in ("com_captura", "sem_captura")}
+        muda = [x["foto"]["file"] for x in xs if x.get("inventados") and any(
+            x["impacto"][n]["obtida"] != x["impacto"][n]["sem_invencao"] for n in ("com_captura", "sem_captura"))]
+        linhas.append(f"Decisão do cliente com a foto: regras atuais {pct(certas['com_captura'], len(xs))} | "
+                      f"se a captura fosse aceita {pct(certas['sem_captura'], len(xs))}")
+        linhas.append(f"Invenção que muda a decisão: {len(muda)}" + (f" ({', '.join(muda)})" if muda else ""))
     if sem_extracao:
         linhas.append(f"Fotos sem extração no cache: {', '.join(sem_extracao)}")
     return linhas
@@ -203,6 +289,8 @@ def relatorio(r):
           "## Resumo", "", "```", *resumo(r), "```", ""]
 
     md += ["## Por defeito", ""] + tabela_por_grupo(avaliadas, lambda x: x["foto"]["defect"]) + [""]
+    md += ["## Por defeito e intensidade", ""] + tabela_por_grupo(
+        avaliadas, lambda x: f"{x['foto']['defect']} · {x['foto']['severity'] or '—'}") + [""]
     md += ["## Por severidade", ""] + tabela_por_grupo(avaliadas, lambda x: x["foto"]["severity"]) + [""]
     md += ["## Nome do arquivo visível na foto (label_leak)", "",
            "Nessas fotos o modelo pode ler cliente e competência na barra do visualizador.", ""]
@@ -249,6 +337,13 @@ def relatorio(r):
         md += ["## Matriz de confusão do capture_type", "",
                "Todas as fotos extraídas, inclusive as ilegíveis. Linhas: expected_capture_type. Colunas: extraído.", ""]
         md += tabela_captura(capturas) + [""]
+        alarmes = [x["foto"]["file"] for x in r["resultados"] if x["extracao"]
+                   and x["foto"]["expected_capture_type"] == "photo_of_paper"
+                   and x["extracao"].get("capture_type") in CAPTURAS_DE_TELA]
+        papel = sum(1 for x in r["resultados"] if x["extracao"] and x["foto"]["expected_capture_type"] == "photo_of_paper")
+        md += [f"**Alarme falso (foto do papel classificada como captura de tela, reprovaria por engano): "
+               f"{len(alarmes)} de {papel} fotos do papel**" + (f": {', '.join(alarmes)}" if alarmes else "")
+               + ("" if papel else " (a base ainda não tem foto do papel)"), ""]
         md += ["| Foto | Gabarito | Extraído |", "|---|---|---|"]
         md += [f"| {x['foto']['file']} | {x['foto']['expected_capture_type']} | {fmt(x['extracao'].get('capture_type'))} |"
                for x in r["resultados"] if x["extracao"]] + [""]
@@ -279,7 +374,40 @@ def relatorio(r):
                   f"{'legível' if passa else 'ilegível'} | {'legível' if legivel else 'ilegível'} | {llm} | {alerta} |")
     if sem_ocr:
         md += ["", "Sem OCR (rode `.venv/bin/python -m core.ocr --set v2`): " + ", ".join(sem_ocr)]
+
+    com_inv = [x for x in avaliadas if x["inventados"]]
+    md += ["", "## Campos cortados inventados e efeito na decisão", "",
+           "Decisão do motor com a extração como veio e com os campos inventados como null. "
+           "Com a regra de captura, toda foto de tela reprova antes; por isso a visão sem captura também aparece.", ""]
+    if com_inv:
+        md += ["| Foto | Inventados | Com captura: como veio → sem invenção | Sem captura: como veio → sem invenção | "
+               "Muda a decisão? |", "|---|---|---|---|---|"]
+        for x in com_inv:
+            i = x["impacto"]
+            muda = [n for n in ("com_captura", "sem_captura") if i[n]["obtida"] != i[n]["sem_invencao"]]
+            md.append(f"| {x['foto']['file']} | " + "; ".join(f"{c} = {fmt(v)}" for c, v in x["inventados"]) + " | "
+                      + " | ".join(f"{fmt_dec(i[n]['obtida'])} → {fmt_dec(i[n]['sem_invencao'])}"
+                                   for n in ("com_captura", "sem_captura"))
+                      + f" | {'sim (' + ', '.join(muda) + ')' if muda else 'não'} |")
+    else:
+        md.append("Nenhum.")
+
+    md += ["", "## Impacto na decisão do cliente", "",
+           "A foto substitui o documento de origem no cliente; os outros documentos vêm do gabarito.", ""]
+    for nome, titulo in (("com_captura", "Regras atuais (foto de tela reprova)"),
+                         ("sem_captura", "Se a captura fosse aceita (capture_type = photo_of_paper)")):
+        xs = [x for x in r["resultados"] if "impacto" in x]
+        ok = [x for x in xs if x["impacto"][nome]["esperada"] == x["impacto"][nome]["obtida"]]
+        md += [f"### {titulo}: {pct(len(ok), len(xs))} certas", "",
+               "| Foto | Esperada | Motor | |", "|---|---|---|---|"]
+        md += [f"| {x['foto']['file']} | {fmt_dec(x['impacto'][nome]['esperada'])} | "
+               f"{fmt_dec(x['impacto'][nome]['obtida'])} | "
+               f"{'✓' if x['impacto'][nome]['esperada'] == x['impacto'][nome]['obtida'] else '✗'} |" for x in xs] + [""]
     return "\n".join(md) + "\n"
+
+
+def fmt_dec(d):
+    return f"{d[0]}/{d[1]}" if d[1] else d[0]
 
 
 def main():

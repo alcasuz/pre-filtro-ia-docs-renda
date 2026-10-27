@@ -35,10 +35,10 @@ The engine (`core/engine.py`) is a pure function: it keeps no state between call
 |---|---|---|---|
 | Applicant record, including `analysis_date` | caller (`Cliente`) | today's date | fixed date from `applicants.csv` |
 | Documents (extraction, including `capture_type` from prompt v3, + OCR confidence) | caller (`Documento` list) | extraction and OCR of the uploaded files | cached extraction (or the ground truth, in oracle mode) + `cache/ocr/confidence.csv` |
-| `prior_legibility_failures` | caller (request history) | number of rejections for illegibility this request already had | always 0 (the test set has no history) |
+| `prior_legibility_failures` | caller (request history) | number of rejections for an unreadable or incomplete document this request already had | always 0 (the test set has no history) |
 | Rule parameters | `config/default_rules.yaml` | default file, multiplier editable | default file, version recorded in each report |
 
-The front end owns the request history (e.g., how many times it was rejected for illegibility) and passes it on every call; the engine never stores it. Requests are not tracked by file hash.
+The front end owns the request history (e.g., how many times it was rejected for an unreadable or incomplete document) and passes it on every call; the engine never stores it. Requests are not tracked by file hash.
 
 ## Risks and design decisions
 

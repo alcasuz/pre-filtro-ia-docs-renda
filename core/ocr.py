@@ -38,8 +38,13 @@ def versao_tesseract():
 def confianca_media(caminho, idioma=IDIOMA):
     """Devolve {"mean_confidence": float de 0 a 100, "words": int} para a imagem."""
     with Image.open(caminho) as imagem:
-        dados = pytesseract.image_to_data(imagem, lang=idioma, config=CONFIG_TESSERACT,
-                                          output_type=pytesseract.Output.DICT)
+        return confianca_da_imagem(imagem, idioma)
+
+
+def confianca_da_imagem(imagem, idioma=IDIOMA):
+    """Como confianca_media, para uma imagem já aberta (ex.: girada)."""
+    dados = pytesseract.image_to_data(imagem, lang=idioma, config=CONFIG_TESSERACT,
+                                      output_type=pytesseract.Output.DICT)
     confiancas = [float(c) for c, texto in zip(dados["conf"], dados["text"])
                   if float(c) >= 0 and texto.strip()]
     media = sum(confiancas) / len(confiancas) if confiancas else 0.0

@@ -1,7 +1,7 @@
 """Motor de regras: aplica as regras da v1 aos documentos de um cliente e decide.
 
-Ordem (rules.md): legibilidade, tipo, captura de tela, titular, período, renda e,
-por fim, as revisões (consistência e fraude). Todas as regras rodam, sem parar na primeira
+Ordem (rules.md): legibilidade, tipo, captura de tela, documento incompleto,
+titular, período, renda e, por fim, as revisões (consistência e fraude). Todas as regras rodam, sem parar na primeira
 falha, para que a lista completa de motivos e a renda fiquem registradas mesmo
 quando o cliente é reprovado. Decisão: qualquer reject vence qualquer review;
 qualquer review vence approve. O motivo principal é o primeiro reject na ordem
@@ -12,15 +12,15 @@ Quais documentos cada regra recebe:
   e pelos dígitos verificadores do CPF lido;
 - fraude: os legíveis;
 - tipo: os legíveis; um documento de outro tipo junto com holerites é ignorado;
-- captura de tela, titular e consistência: os holerites legíveis;
+- captura de tela, documento incompleto, titular e consistência: os holerites legíveis;
 - período e renda: todos os holerites, inclusive um ilegível cujos dados existam
   (modo oracle). Sem nenhum holerite, período e renda não são avaliados.
 
 Contrato de entrada: o motor não guarda estado. Quem chama informa a
 analysis_date (em Cliente) e prior_legibility_failures, quantas reprovações por
-ilegibilidade o pedido já teve (padrão 0).
+ilegibilidade ou documento incompleto o pedido já teve (padrão 0).
 
-Documento escalado por tentativas (too_many_attempts): os dados dele faltam no
+Documento escalado por tentativas (too_many_attempts, ilegível ou incompleto): os dados dele faltam no
 período e na renda, que reprovariam o cliente por isso e anulariam o fallback
 (reject vence review). Então, quando há um documento escalado, uma reprovação de
 período ou renda vira revisão, com o motivo original mantido na lista. As outras
@@ -28,17 +28,16 @@ reprovações (tipo, captura de tela, titular) continuam valendo.
 """
 
 from .models import APPROVE, PASS, REJECT, REVIEW, Decisao
-from .rules import (consistency, document_type, fraud, identification, income, legibility, screen_capture,
-                    time_window)
+from .rules import (completeness, consistency, document_type, fraud, identification, income, legibility,
+                    screen_capture, time_window)
 
-ORDEM_REGRAS = ["legibility", "document_type", "screen_capture", "identification", "time_window", "income",
-                "consistency", "fraud"]
+ORDEM_REGRAS = ["legibility", "document_type", "screen_capture", "completeness", "identification", "time_window",
+                "income", "consistency", "fraud"]
 
 
 def decidir(cliente, documentos, config, prior_legibility_failures=0):
     resultados = [legibility.avaliar(d, config, prior_legibility_failures) for d in documentos]
     ilegiveis = {r.file for r in resultados if r.status != PASS}
-    escalados = [r.file for r in resultados if r.reason == "too_many_attempts"]
     legiveis = [d for d in documentos if d.file not in ilegiveis]
 
     resultados.append(document_type.avaliar(legiveis))
@@ -46,6 +45,8 @@ def decidir(cliente, documentos, config, prior_legibility_failures=0):
     holerites_legiveis = [d for d in holerites if d.file not in ilegiveis]
 
     resultados += [screen_capture.avaliar(d) for d in holerites_legiveis]
+    resultados += [completeness.avaliar(d, config, prior_legibility_failures) for d in holerites_legiveis]
+    escalados = [r.file for r in resultados if r.reason == "too_many_attempts"]
     resultados += [identification.avaliar(d, cliente, config) for d in holerites_legiveis]
 
     meses_usados, renda_valida = [], None
