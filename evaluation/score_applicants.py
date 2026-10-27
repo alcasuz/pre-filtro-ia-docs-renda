@@ -5,9 +5,11 @@ Dois modos de entrada, sem nenhuma chamada de API:
   line_items.csv), simulando um LLM perfeito. Mede o motor de regras com o OCR
   real. Fraude = extra_text preenchido; capture_type pela degradation
   (captura_esperada de score_documents.py); bank_statement conta como other.
+  Documento com degradation = blurred vem sem nenhum campo, como um LLM perfeito
+  devolveria para uma imagem que não dá para ler.
 - --source cache --model <modelo>: documentos vindos do cache do LLM
   (cache/<prompt>/<modelo>/). Mede o sistema de ponta a ponta.
-Nos dois modos, a legibilidade vem da confiança do OCR em cache/ocr/confidence.csv
+Nos dois modos, o número de palavras do OCR vem de cache/ocr/confidence.csv
 (gerado por .venv/bin/python -m core.ocr).
 
 Reporta matriz de confusão (approve, reject, review), acerto por classe, acerto
@@ -37,13 +39,12 @@ from core import config as configuracao  # noqa: E402
 from core.engine import decidir  # noqa: E402
 from core.inputs import documento_da_extracao  # noqa: E402
 from core.models import Cliente, Documento, Linha  # noqa: E402
-from core.ocr import ARQUIVO_CONFIANCAS, carregar_confiancas  # noqa: E402
+from core.ocr import ARQUIVO_CONFIANCAS, carregar_palavras  # noqa: E402
 from score_documents import captura_esperada  # noqa: E402
 
 PASTA_DADOS = RAIZ / "data"
 PASTA_RESULTADOS = Path(__file__).resolve().parent / "results"
 CLASSES = ["approve", "reject", "review"]
-TIPO_NO_EVAL = {"bank_statement": "other"}
 
 
 def ler_csv(nome, encoding="utf-8"):
@@ -61,7 +62,10 @@ def clientes():
             for a in ler_csv("applicants.csv")}
 
 
-def documentos_oracle(confiancas):
+TIPO_NO_EVAL = {"bank_statement": "other"}
+
+
+def documentos_oracle(palavras):
     proventos = defaultdict(list)
     for l in ler_csv("line_items.csv"):
         if l["kind"] == "earning":
@@ -69,6 +73,10 @@ def documentos_oracle(confiancas):
     por_cliente, faltando = defaultdict(list), []
     for d in ler_csv("documents.csv"):
         fraude = bool(d["extra_text"])
+        if d["degradation"] == "blurred":
+            d = {**d, **{c: "" for c in ("pay_period", "name_on_doc", "cpf_on_doc", "total_earnings",
+                                          "total_deductions", "net_pay")}}
+            proventos[d["file"]] = []
         por_cliente[d["applicant_id"]].append(Documento(
             file=d["file"], document_type=TIPO_NO_EVAL.get(d["true_type"], d["true_type"]),
             pay_period=d["pay_period"] or None, name_on_doc=d["name_on_doc"] or None,
@@ -76,12 +84,12 @@ def documentos_oracle(confiancas):
             total_deductions=dinheiro(d["total_deductions"]), net_pay=dinheiro(d["net_pay"]),
             earnings_lines=proventos[d["file"]], fraud_suspected=fraude,
             fraud_reason="texto de injection" if fraude else None,
-            ocr_confidence=confiancas.get(d["file"]), capture_type=captura_esperada(d),
+            ocr_words=palavras.get(d["file"]), capture_type=captura_esperada(d),
         ))
     return por_cliente, faltando
 
 
-def documentos_cache(prompt, modelo, confiancas):
+def documentos_cache(prompt, modelo, palavras):
     pasta = RAIZ / "cache" / prompt / modelo
     if not pasta.is_dir():
         sys.exit(f"Cache não encontrado: {pasta.relative_to(RAIZ)}")
@@ -92,7 +100,7 @@ def documentos_cache(prompt, modelo, confiancas):
             faltando.append(d["file"])
             continue
         extracao = json.loads(caminho.read_text(encoding="utf-8"))["extraction"]
-        por_cliente[d["applicant_id"]].append(documento_da_extracao(d["file"], extracao, confiancas.get(d["file"])))
+        por_cliente[d["applicant_id"]].append(documento_da_extracao(d["file"], extracao, palavras.get(d["file"])))
     return por_cliente, faltando
 
 
@@ -100,15 +108,15 @@ def avaliar(fonte, prompt, modelo):
     cfg = configuracao.carregar()
     if not ARQUIVO_CONFIANCAS.exists():
         sys.exit("Sem confiança de OCR: rode .venv/bin/python -m core.ocr")
-    confiancas = carregar_confiancas()
+    palavras = carregar_palavras()
     arquivos = [d["file"] for d in ler_csv("documents.csv")]
-    sem_ocr = [a for a in arquivos if a not in confiancas]
+    sem_ocr = [a for a in arquivos if a not in palavras]
     if sem_ocr:
-        sys.exit(f"Documentos sem confiança de OCR: {', '.join(sem_ocr)}")
+        sys.exit(f"Documentos sem OCR: {', '.join(sem_ocr)}")
     if fonte == "oracle":
-        docs, faltando = documentos_oracle(confiancas)
+        docs, faltando = documentos_oracle(palavras)
     else:
-        docs, faltando = documentos_cache(prompt, modelo, confiancas)
+        docs, faltando = documentos_cache(prompt, modelo, palavras)
     gabarito = ler_csv("ground_truth.csv", encoding="utf-8-sig")
     cadastro = clientes()
 
@@ -184,7 +192,7 @@ def relatorio(r, m):
           f"Gerado por `evaluation/score_applicants.py`, sem chamadas à API. Configuração: "
           f"`config/default_rules.yaml` v{r['config'].version} "
           f"(multiplicador {r['config'].income_multiplier}, similaridade {r['config'].name_similarity}, "
-          f"legibilidade OCR >= {r['config'].legibility_min_confidence:g}).", "",
+          "porteiro: OCR e LLM sem leitura ou CPF inválido).", "",
           "## Resumo", "", "```", *resumo(r, m), "```", "",
           "## Matriz de confusão", "", "Linhas: gabarito. Colunas: motor.", "",
           "| gabarito \\ obtido | " + " | ".join(CLASSES) + " |", "|---" * (len(CLASSES) + 1) + "|"]

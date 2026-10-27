@@ -37,7 +37,7 @@ flowchart TD
     F["Front (Streamlit)<br/>cadastro, multiplicador, documentos"] --> OCR
     E["Eval<br/>base de teste fictícia"] --> OCR
     subgraph N["Núcleo compartilhado"]
-        OCR["OCR (Tesseract)<br/>texto + confiança"] --> X["Extração (Gemini)<br/>JSON com linhas classificadas"]
+        OCR["OCR (Tesseract)<br/>texto + contagem de palavras"] --> X["Extração (Gemini)<br/>JSON com linhas classificadas"]
         X <--> C[("Cache de extrações")]
         X --> V["Validação do JSON<br/>guardrails"]
         V --> M["Motor de regras<br/>calcula e decide"]
@@ -61,7 +61,7 @@ Todas as decisões, com motivo e alternativas descartadas, estão em [`decisions
 1. **Prompting + motor de regras, em vez de fine-tuning ou RAG.** As regras são poucas, fixas e cabem no prompt; fine-tuning exigiria base rotulada linha a linha e retreino a cada mudança de regra.
 2. **Escopo da v1 só com holerite.** Extrato bancário tem um problema aberto (distinguir a renda de quem vende como pessoa física de uma transferência pontual) e ficou para a v2. Qualquer outro arquivo é reprovado com uma mensagem única e acionável: "no momento aceitamos apenas holerite".
 3. **Humano revisa as aprovações, não as reprovações.** Isso concentra o analista onde está o risco de crédito, mas torna o **falso negativo** (reprovar quem deveria passar) o erro crítico, porque ninguém o revisa. Por isso, a reprovação automática só acontece com alta certeza.
-4. **Legibilidade medida pela confiança do OCR, não pela autoavaliação do LLM.** Um sinal numérico e estável é calibrável; a opinião do modelo sobre a própria leitura, não.
+4. **Legibilidade decidida por código a partir de sinais verificáveis, não pela autoavaliação do LLM.** Um documento é ilegível quando o OCR não acha nenhuma palavra e o LLM não extrai nada, ou quando o CPF falha nos dígitos verificadores. A confiança média do OCR foi testada antes e descartada: em fotos reais, barrava documentos que o LLM lia bem.
 5. **Demo pública sem upload.** A demo usa só documentos fictícios com extrações em cache: custo zero, nenhum risco de receber documento real e resposta instantânea.
 
 ## Como eu avalio
@@ -118,7 +118,7 @@ Python · Gemini API (plano gratuito, modelos Flash) · Tesseract OCR · Streaml
    tesseract --list-langs     # precisa listar "por"
    ```
 
-Versões usadas na calibração do limite de legibilidade: **Tesseract 5.5.3** (Leptonica 1.87.0), modelo de português do port **`tesseract-por` 4.1.0** (família `tessdata` padrão), segmentação `--psm 3`. A confiança do OCR muda com a versão do Tesseract ou com o modelo de idioma, então o limite em `config/default_rules.yaml` precisa ser recalibrado se algum deles mudar. O `core/ocr.py` procura o programa no `PATH` ou em `/opt/local/bin`; defina `TESSERACT_CMD` para usar outro local.
+Versões usadas na contagem de palavras do OCR: **Tesseract 5.5.3** (Leptonica 1.87.0), modelo de português do port **`tesseract-por` 4.1.0** (família `tessdata` padrão), segmentação `--psm 3`. A contagem de palavras pode mudar com a versão do Tesseract ou com o modelo de idioma; rode os evals de novo se algum deles mudar. O `core/ocr.py` procura o programa no `PATH` ou em `/opt/local/bin`; defina `TESSERACT_CMD` para usar outro local.
 
 ```bash
 # 1. Criar o ambiente virtual e instalar as dependências com versões fixas

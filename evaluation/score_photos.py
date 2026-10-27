@@ -21,8 +21,13 @@ Regras de comparação (as mesmas de score_documents.py):
   mostrado, mas não conta como acerto, erro ou invenção;
 - fotos com expected_legible = no ficam fora da acurácia, num bloco separado;
 - label_leak = yes (o nome do arquivo aparece na foto) é reportado à parte.
-O porteiro de legibilidade usa cache/ocr/confidence_v2.csv e o limite de
-config/default_rules.yaml, sem alterar nada no motor.
+O porteiro de legibilidade é o do motor (core/rules/legibility.py), com o número
+de palavras de cache/ocr/confidence_v2.csv; a confiança média aparece só como
+informação.
+
+Erros de decisão são separados em dois grupos: reprovação recuperável de foto
+legível (o motor pediu um novo envio com illegible ou incomplete_document, quando o esperado era outra coisa) e decisão final errada
+(qualquer outro erro: aprovar, revisar ou reprovar pelo motivo errado).
 
 Impacto na decisão: para cada foto, o documento de origem é trocado pela foto
 no cliente dele (os demais documentos vêm do gabarito, como no modo oracle de
@@ -56,7 +61,8 @@ from core import config as configuracao  # noqa: E402
 from core.engine import decidir  # noqa: E402
 from core.inputs import documento_da_extracao  # noqa: E402
 from core.models import CAPTURAS_DE_TELA  # noqa: E402
-from core.ocr import carregar_confiancas  # noqa: E402
+from core.ocr import carregar_palavras  # noqa: E402
+from core.rules import legibility  # noqa: E402
 from core.rules.completeness import CAMPOS_OBRIGATORIOS  # noqa: E402
 from score_applicants import clientes, documentos_oracle  # noqa: E402
 from score_documents import (CAMPOS_TEXTO, CAMPOS_VALOR, PROMPTS_PRINT_E_FRAUDE, TIPO_NO_EVAL,  # noqa: E402
@@ -65,6 +71,10 @@ from score_documents import (CAMPOS_TEXTO, CAMPOS_VALOR, PROMPTS_PRINT_E_FRAUDE,
 PASTA_DADOS = RAIZ / "data"
 PASTA_RESULTADOS = Path(__file__).resolve().parent / "results"
 CAMPOS = ["document_type"] + CAMPOS_TEXTO + CAMPOS_VALOR + ["fraud_suspected"]
+# Reprovações que pedem um novo envio (o cliente pode se recuperar sozinho).
+RECUPERAVEIS = ("illegible", "incomplete_document")
+VISOES = (("com_captura", "Regras atuais (foto de tela reprova)"),
+          ("sem_captura", "Se a captura fosse aceita (capture_type = photo_of_paper)"))
 
 
 def ler_csv(caminho):
@@ -154,7 +164,7 @@ def avaliar(prompt, modelo):
     ocr = {o["file"]: o for o in ler_csv(RAIZ / "cache" / "ocr" / "confidence_v2.csv")}
     log = ler_csv(pasta / "_log.csv") if (pasta / "_log.csv").exists() else []
 
-    docs_oracle, _ = documentos_oracle(carregar_confiancas())
+    docs_oracle, _ = documentos_oracle(carregar_palavras())
     cadastro = clientes()
     gabarito = {g["applicant_id"]: g for g in ler_csv_bom(PASTA_DADOS / "ground_truth.csv")}
 
@@ -166,11 +176,27 @@ def avaliar(prompt, modelo):
         if e is not None and foto["expected_legible"] == "yes":
             r.update(avaliar_foto(foto, docs[foto["source_file"]], proventos[foto["source_file"]], e, prompt))
         if e is not None:
+            doc = documento_da_extracao(foto["file"], e, palavras_ocr(r["ocr"]))
+            r["porteiro"] = legibility.avaliar(doc, cfg)
             r["impacto"] = impacto(foto, e, r["ocr"], cfg, docs_oracle, cadastro, gabarito[foto["applicant_id"]],
                                    docs[foto["source_file"]], r.get("inventados", []))
         resultados.append(r)
-    return {"prompt": prompt, "modelo": modelo, "limite": cfg.legibility_min_confidence,
+    return {"prompt": prompt, "modelo": modelo,
             "resultados": resultados, "log": log}
+
+
+def palavras_ocr(ocr):
+    return int(ocr["words"]) if ocr else None
+
+
+def classificar_erro(x, visao):
+    """None se a decisão está certa; senão 'recuperavel' ou 'final'."""
+    i = x["impacto"][visao]
+    if i["esperada"] == i["obtida"]:
+        return None
+    if x["foto"]["expected_legible"] == "yes" and i["obtida"][1] in RECUPERAVEIS:
+        return "recuperavel"
+    return "final"
 
 
 def ler_csv_bom(caminho):
@@ -198,7 +224,7 @@ def rodar_motor(foto, e, ocr, cfg, docs_oracle, cadastro, captura=None, anular=(
     e = dict(e, **{c: None for c in anular})
     if captura:
         e["capture_type"] = captura
-    doc = documento_da_extracao(foto["file"], e, float(ocr["mean_confidence"]) if ocr else None)
+    doc = documento_da_extracao(foto["file"], e, palavras_ocr(ocr))
     cid = foto["applicant_id"]
     outros = [d for d in docs_oracle[cid] if d.file != foto["source_file"]]
     d = decidir(cadastro[cid], outros + [doc], cfg, prior_legibility_failures=0)
@@ -239,11 +265,11 @@ def resumo(r):
     limpas = [x for x in avaliadas if x["foto"]["label_leak"] == "no"]
     al, tl = sum(acerto(x)[0] for x in limpas), sum(acerto(x)[1] for x in limpas)
     inv = sum(len(x["inventados"]) for x in avaliadas)
-    porteiro = [x for x in r["resultados"] if x["ocr"]]
-    fn = [x["foto"]["file"] for x in porteiro if x["foto"]["expected_legible"] == "yes"
-          and float(x["ocr"]["mean_confidence"]) < r["limite"]]
+    porteiro = [x for x in r["resultados"] if "porteiro" in x]
+    fn = [f"{x['foto']['file']} ({x['porteiro'].reason})" for x in porteiro
+          if x["foto"]["expected_legible"] == "yes" and x["porteiro"].status != "pass"]
     fp = [x["foto"]["file"] for x in porteiro if x["foto"]["expected_legible"] == "no"
-          and float(x["ocr"]["mean_confidence"]) >= r["limite"]]
+          and x["porteiro"].status == "pass"]
     ok = [l for l in r["log"] if l["status"] == "ok"]
     lat = [float(l["latency_s"]) for l in ok]
     tokens = {k: sum(int(l[k]) for l in ok) / len(ok) for k in ("input_tokens", "output_tokens", "thought_tokens",
@@ -260,7 +286,7 @@ def resumo(r):
         linhas.append("capture_type certo (todas as fotos, legíveis ou não): "
                       f"{pct(sum(e == o for e, o in capturas), len(capturas))}")
     linhas += [
-        f"Porteiro OCR (limite {r['limite']:g}): legíveis barradas (falso negativo): {len(fn)}"
+        f"Porteiro de legibilidade: legíveis barradas (falso negativo): {len(fn)}"
         + (f" ({', '.join(fn)})" if fn else "")
         + f" | ilegíveis aprovadas: {len(fp)}" + (f" ({', '.join(fp)})" if fp else ""),
         f"API: {len(r['log'])} chamadas | erros: {pct(len(r['log']) - len(ok), len(r['log']))} | "
@@ -273,8 +299,11 @@ def resumo(r):
                   for n in ("com_captura", "sem_captura")}
         muda = [x["foto"]["file"] for x in xs if x.get("inventados") and any(
             x["impacto"][n]["obtida"] != x["impacto"][n]["sem_invencao"] for n in ("com_captura", "sem_captura"))]
-        linhas.append(f"Decisão do cliente com a foto: regras atuais {pct(certas['com_captura'], len(xs))} | "
-                      f"se a captura fosse aceita {pct(certas['sem_captura'], len(xs))}")
+        for n, titulo in VISOES:
+            erros = Counter(classificar_erro(x, n) for x in xs)
+            linhas.append(f"Decisão do cliente com a foto, {titulo.lower()}: certas {pct(certas[n], len(xs))} | "
+                          f"reprovações recuperáveis de foto legível: {erros['recuperavel']} | "
+                          f"decisões finais erradas: {erros['final']}")
         linhas.append(f"Invenção que muda a decisão: {len(muda)}" + (f" ({', '.join(muda)})" if muda else ""))
     if sem_extracao:
         linhas.append(f"Fotos sem extração no cache: {', '.join(sem_extracao)}")
@@ -354,15 +383,19 @@ def relatorio(r):
             md += [f"**{x['foto']['file']}**", "", "```json",
                    json.dumps(x["extracao"], ensure_ascii=False, indent=2), "```", ""]
 
-    md += ["## Porteiro do OCR", "",
-           f"Limite atual: {r['limite']:g} (provisório, calibrado na base sintética). "
+    md += ["## Porteiro de legibilidade", "",
+           "Ilegível se o OCR reconhece 0 palavras e o LLM não extrai nada, ou se o CPF tem dígitos inválidos. "
+           "A confiança média do OCR é só informativa. "
            "⚠️ marca legível barrada pelo porteiro (falso negativo) ou ilegível aprovada.", "",
-           "| Foto | Confiança OCR | Palavras | Porteiro | Seu julgamento | LLM extraiu certo | |",
+           "| Foto | Palavras OCR | Confiança OCR | Porteiro | Seu julgamento | LLM extraiu certo | |",
            "|---|---|---|---|---|---|---|"]
     sem_ocr = [x["foto"]["file"] for x in r["resultados"] if not x["ocr"]]
-    for x in sorted((x for x in r["resultados"] if x["ocr"]), key=lambda x: float(x["ocr"]["mean_confidence"])):
+    for x in sorted((x for x in r["resultados"] if "porteiro" in x),
+                    key=lambda x: palavras_ocr(x["ocr"]) if x["ocr"] else -1):
         conf = float(x["ocr"]["mean_confidence"]) if x["ocr"] else None
-        passa = conf is not None and conf >= r["limite"]
+        p = x["porteiro"]
+        passa = p.status == "pass"
+        veredito = "legível" if passa else f"{p.reason} ({p.details['criterion']})"
         legivel = x["foto"]["expected_legible"] == "yes"
         if "campos" in x:
             a, t = acerto(x)
@@ -370,8 +403,8 @@ def relatorio(r):
         else:
             llm = "fora da acurácia"
         alerta = "⚠️" if passa != legivel else ""
-        md.append(f"| {x['foto']['file']} | {fmt(conf)} | {x['ocr']['words'] if x['ocr'] else '—'} | "
-                  f"{'legível' if passa else 'ilegível'} | {'legível' if legivel else 'ilegível'} | {llm} | {alerta} |")
+        md.append(f"| {x['foto']['file']} | {x['ocr']['words'] if x['ocr'] else '—'} | {fmt(conf)} | "
+                  f"{veredito} | {'legível' if legivel else 'ilegível'} | {llm} | {alerta} |")
     if sem_ocr:
         md += ["", "Sem OCR (rode `.venv/bin/python -m core.ocr --set v2`): " + ", ".join(sem_ocr)]
 
@@ -394,15 +427,17 @@ def relatorio(r):
 
     md += ["", "## Impacto na decisão do cliente", "",
            "A foto substitui o documento de origem no cliente; os outros documentos vêm do gabarito.", ""]
-    for nome, titulo in (("com_captura", "Regras atuais (foto de tela reprova)"),
-                         ("sem_captura", "Se a captura fosse aceita (capture_type = photo_of_paper)")):
+    marcas = {None: "✓", "recuperavel": "✗ recuperável", "final": "✗ final"}
+    for nome, titulo in VISOES:
         xs = [x for x in r["resultados"] if "impacto" in x]
-        ok = [x for x in xs if x["impacto"][nome]["esperada"] == x["impacto"][nome]["obtida"]]
-        md += [f"### {titulo}: {pct(len(ok), len(xs))} certas", "",
+        erros = Counter(classificar_erro(x, nome) for x in xs)
+        md += [f"### {titulo}: {pct(erros[None], len(xs))} certas", "",
+               f"- Reprovações recuperáveis de foto legível ({', '.join(RECUPERAVEIS)} quando o esperado era outro): "
+               f"{erros['recuperavel']}",
+               f"- Decisões finais erradas: {erros['final']}", "",
                "| Foto | Esperada | Motor | |", "|---|---|---|---|"]
         md += [f"| {x['foto']['file']} | {fmt_dec(x['impacto'][nome]['esperada'])} | "
-               f"{fmt_dec(x['impacto'][nome]['obtida'])} | "
-               f"{'✓' if x['impacto'][nome]['esperada'] == x['impacto'][nome]['obtida'] else '✗'} |" for x in xs] + [""]
+               f"{fmt_dec(x['impacto'][nome]['obtida'])} | {marcas[classificar_erro(x, nome)]} |" for x in xs] + [""]
     return "\n".join(md) + "\n"
 
 

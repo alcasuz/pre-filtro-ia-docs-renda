@@ -40,7 +40,7 @@ def test_legibilidade_vem_antes_do_tipo():
 
 def test_documento_nao_holerite_legivel_com_tudo_nulo_reprova_por_tipo():
     # N01: a conta de luz volta do LLM como other com tudo nulo, mas o OCR a lê bem.
-    r = decidir(cliente(), [documento_vazio(arquivo="T01_conta_de_luz.png", ocr=84.86)], CONFIG)
+    r = decidir(cliente(), [documento_vazio(arquivo="T01_conta_de_luz.png", palavras=120)], CONFIG)
     assert (r.decision, r.main_reason, r.reasons) == (REJECT, "type_not_accepted", ["type_not_accepted"])
 
 
@@ -136,7 +136,7 @@ def test_print_de_extrato_extra_junto_com_holerites_e_ignorado():
 
 def test_legibilidade_vem_antes_da_captura_de_tela():
     docs = tres_meses(captura="screenshot")
-    docs[0] = holerite(periodo="2026-07", captura="screenshot", ocr=10.0)
+    docs[0] = holerite(periodo="2026-07", captura="screenshot", cpf="782.943.622-38")
     r = decidir(cliente(), docs, CONFIG)
     assert r.main_reason == "illegible" and r.reasons[:2] == ["illegible", "screen_capture"]
 
@@ -196,7 +196,7 @@ def test_incompleto_vem_antes_do_titular_e_da_renda():
 
 def test_ilegivel_vem_antes_do_incompleto():
     docs = tres_meses()
-    docs[0] = holerite(periodo="2026-07", linhas=[], ocr=10.0)
+    docs[0] = holerite(periodo="2026-07", linhas=[], cpf="782.943.622-38")
     r = decidir(cliente(), docs, CONFIG)
     assert r.main_reason == "illegible" and "incomplete_document" not in r.reasons
 
@@ -216,3 +216,22 @@ def test_contador_compartilhado_segunda_tentativa_incompleta_ainda_reprova():
     docs = tres_meses()
     docs[2] = holerite(periodo="2026-09", linhas=[])
     assert decidir(cliente(), docs, CONFIG, prior_legibility_failures=1).main_reason == "incomplete_document"
+
+
+# ---------------------------------------------------------------------------
+# Competência distante: decidida pela R3, não pelo porteiro
+# ---------------------------------------------------------------------------
+
+def test_competencia_lida_com_ano_errado_reprova_como_fora_do_periodo():
+    # A16_07 cortada: o LLM leu 2023-07 no lugar de 2026-07.
+    docs = tres_meses()
+    docs[0] = holerite(periodo="2023-07")
+    r = decidir(cliente(), docs, CONFIG)
+    assert (r.decision, r.main_reason) == (REJECT, "outside_window")
+    assert "illegible" not in r.reasons
+
+
+def test_documento_extra_com_data_antiga_nao_reprova_o_cliente():
+    # Um documento de identidade extra cuja data de expedição o LLM pôs em pay_period é ignorado (R1).
+    extra = holerite(tipo="other", periodo="2016-02", arquivo="T01_identidade.png", linhas=[])
+    assert decidir(cliente(), tres_meses() + [extra], CONFIG).decision == APPROVE

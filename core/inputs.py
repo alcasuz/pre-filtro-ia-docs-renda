@@ -12,7 +12,7 @@ def valor(numero):
     return Decimal(str(numero)).quantize(Decimal("0.01"))
 
 
-def documento_da_extracao(file, extracao, ocr_confidence=None):
+def documento_da_extracao(file, extracao, ocr_words=None):
     return Documento(
         file=file,
         document_type=extracao["document_type"],
@@ -26,6 +26,6 @@ def documento_da_extracao(file, extracao, ocr_confidence=None):
                         for l in extracao["earnings_lines"]],
         fraud_suspected=bool(extracao["fraud_suspected"]),
         fraud_reason=extracao["fraud_reason"],
-        ocr_confidence=ocr_confidence,
+        ocr_words=ocr_words,
         capture_type=extracao.get("capture_type"),
     )

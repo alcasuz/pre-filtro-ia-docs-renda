@@ -8,8 +8,9 @@ qualquer review vence approve. O motivo principal é o primeiro reject na ordem
 das regras ou, sem reject, o primeiro review.
 
 Quais documentos cada regra recebe:
-- legibilidade: todos os documentos, pela confiança do OCR (Documento.ocr_confidence)
-  e pelos dígitos verificadores do CPF lido;
+- legibilidade: todos os documentos, pelo número de palavras do OCR
+  (Documento.ocr_words) junto com o que o LLM extraiu e pelos dígitos
+  verificadores do CPF;
 - fraude: os legíveis;
 - tipo: os legíveis; um documento de outro tipo junto com holerites é ignorado;
 - captura de tela, documento incompleto, titular e consistência: os holerites legíveis;

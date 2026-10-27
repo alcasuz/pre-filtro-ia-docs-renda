@@ -19,7 +19,6 @@ class ConfigRegras:
     name_review: float
     window_months: int
     required_months: int
-    legibility_min_confidence: float
     max_legibility_attempts: int
     # Fórmula de similaridade de nome (core/rules/name_similarity.py); None até ser escolhida.
     name_similarity: Optional[str] = None
@@ -35,7 +34,6 @@ def carregar(caminho=ARQUIVO_PADRAO):
         name_review=float(dados["name_review"]),
         window_months=int(dados["window_months"]),
         required_months=int(dados["required_months"]),
-        legibility_min_confidence=float(dados["legibility_min_confidence"]),
         max_legibility_attempts=int(dados["max_legibility_attempts"]),
         name_similarity=dados.get("name_similarity"),
     )

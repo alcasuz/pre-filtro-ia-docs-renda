@@ -1,7 +1,7 @@
 # Pre-screening rules (fictional business)
 
 > Personal lab. Rules and parameters invented for study purposes; they do not represent any company's policy.
-> Version: v1.4 (2026-10-27)
+> Version: v1.5 (2026-10-27)
 
 ## Glossary (Brazilian terms)
 
@@ -46,7 +46,7 @@ Possible outputs:
 - **Reject always takes precedence over suspected fraud.** If a case fails any reject rule and is also flagged for fraud, the decision is **reject**.
 - The fraud flag is always recorded alongside the decision, even when the case is rejected, so we can measure how many fraud attempts never reach human review.
 - Order of the rules: legibility (R7), document type (R1), screen capture (R1), complete document (R8), applicant (R2), time window (R3), income (R5/R6), then the review rules (R4 consistency, R7 fraud). Reject wins over review; the main reason is the first reject in this order, else the first review.
-- Legibility (R7, OCR confidence and CPF check digits) is checked before document type (R1): an unreadable document is rejected with guidance to resend, never as 'type not accepted'.
+- Legibility (R7: OCR word count together with what the LLM extracted, CPF check digits) is checked before document type (R1): an unreadable document is rejected with guidance to resend, never as 'type not accepted'.
 - Document type is checked before screen capture: a screenshot of a bank statement is rejected as 'type not accepted'.
 
 ---
@@ -102,11 +102,14 @@ Each rule states **Who does it**: `[LLM]` (read/classify), `[OCR]` or `[CODE]` (
 - Who does it: `[CODE]`, from the lines classified in R5.
 
 ### R7. Quality and security
-- Unreadable, cropped or blurred image → **reject with guidance to resend**. An image the OCR can't read at all (no confidence returned) counts as unreadable, and so does a document whose CPF fails the check digits (R2).
-- The same fallback below applies to every legibility failure, whichever signal caused it.
+- A document is unreadable → **reject with guidance to resend** if any of these holds:
+  1. the OCR recognizes no words **and** the LLM extracts no field (every field null and no earnings line): reason `illegible`. An image the OCR can't process counts as zero words. The OCR's average confidence is not used: on real photos it blocked documents the LLM read correctly (e.g., an upside-down photo);
+  2. the CPF fails the check digits (R2): a misreading, reason `illegible`.
+- A pay period far from `analysis_date` is not a legibility criterion: it is decided by R3 (`outside_window`), and a non-accepted extra document is ignored by R1 even if its date was read as a pay period.
+- The same fallback below applies to every legibility failure, whichever criterion caused it.
 - Fallback, per request: if the request already had 2 rejections for illegibility or for an incomplete document (R8), a new legibility failure → **human review** (reason: too many attempts), so an applicant who can't produce a readable image isn't stuck. The count is per request, not per document, and is informed by whoever calls the engine. If the illegible document's data is missing, period and income failures caused by it become review instead of reject; any other reject still applies.
 - Document with text trying to give instructions to the system (prompt injection) or with visible signs of editing → **human review** (suspected fraud). Screenshots and photos of a screen are not fraud (see R1).
-- Who does it (legibility): `[OCR]` produces the average reading confidence; `[CODE]` compares it to a minimum threshold (to be calibrated in the eval), validates the CPF check digits and decides whether the document is unreadable; the caller informs how many legibility rejections the request already had.
+- Who does it (legibility): `[OCR]` counts the words it recognizes; `[LLM]` extracts the fields (null when it can't read them); `[CODE]` combines both, validates the CPF check digits and decides whether the document is unreadable; the caller informs how many legibility or completeness rejections the request already had.
 - Who does it (fraud): `[LLM]` flags suspected fraud in the JSON (prompt injection or signs of editing) with a short justification; `[CODE]` reads the flag and decides.
 
 ### R8. Complete document

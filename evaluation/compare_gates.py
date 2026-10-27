@@ -1,11 +1,16 @@
 """Compara versões do porteiro de legibilidade (R7) sem alterar o motor.
 
-Cada versão decide, documento a documento, se ele é legível; o resultado entra no
-motor como ocr_confidence (100 = legível, 0 = ilegível), então o motor real roda
-inalterado, inclusive a checagem dos dígitos do CPF, que vale em todas as versões.
+Cada versão simulada decide, documento a documento, se ele é legível. Um
+documento ilegível entra no motor como o porteiro final o reconheceria (0
+palavras no OCR e nenhum campo extraído); um legível entra com o OCR marcando ao
+menos uma palavra. O motor real roda inalterado, então os critérios do porteiro
+final que não dependem do OCR (CPF com dígitos inválidos) valem em todas as
+versões.
 
 Versões:
-- atual: confiança média do OCR >= limite do YAML, imagem como veio;
+- final: o porteiro do motor (core/rules/legibility.py), sem simulação;
+- atual: o porteiro anterior: confiança média do OCR >= LIMITE_CONFIANCA, imagem
+  como veio;
 - a_rotacao: o mesmo limite, mas lendo a imagem na melhor rotação (0, 90, 180 ou
   270 graus): a de maior soma das confianças das palavras (palavras x média).
   Contar só palavras não serve: numa rotação errada o Tesseract "reconhece" muito
@@ -45,7 +50,8 @@ sys.path.insert(0, str(Path(__file__).resolve().parent))
 from core import config as configuracao  # noqa: E402
 from core.engine import decidir  # noqa: E402
 from core.inputs import documento_da_extracao  # noqa: E402
-from core.ocr import CONJUNTOS, carregar_confiancas, confianca_da_imagem  # noqa: E402
+from core.rules import legibility  # noqa: E402
+from core.ocr import CONJUNTOS, carregar_palavras, confianca_da_imagem  # noqa: E402
 from score_applicants import clientes, documentos_cache, documentos_oracle  # noqa: E402
 from score_photos import decisao_esperada, ler_csv_bom  # noqa: E402
 
@@ -53,7 +59,8 @@ PASTA_RESULTADOS = Path(__file__).resolve().parent / "results"
 ROTACOES = (0, 90, 180, 270)
 PISO_PALAVRAS = 5
 MESES_COMPETENCIA = 12
-VERSOES = ["atual", "a_rotacao", "b_piso_palavras", "c_sem_ocr"]
+LIMITE_CONFIANCA = 30.0  # limite do porteiro anterior (config v1)
+VERSOES = ["final", "atual", "a_rotacao", "b_piso_palavras", "c_sem_ocr"]
 
 
 def ler_csv(caminho):
@@ -117,14 +124,19 @@ def legivel(versao, doc, cliente, leituras, limite):
 
 
 def aplicar(versao, docs, cliente, leituras, limite):
-    return [replace(d, ocr_confidence=100.0 if legivel(versao, d, cliente, leituras, limite) else 0.0) for d in docs]
+    if versao == "final":
+        return docs
+    return [replace(d, ocr_words=max(d.ocr_words or 0, 1)) if legivel(versao, d, cliente, leituras, limite)
+            else replace(d, ocr_words=0, pay_period=None, name_on_doc=None, cpf_on_doc=None, total_earnings=None,
+                         total_deductions=None, net_pay=None, earnings_lines=[])
+            for d in docs]
 
 
 def avaliar_v1(versao, por_cliente, cadastro, gabarito, leituras, cfg):
     erros = []
     for g in gabarito:
         cid = g["applicant_id"]
-        docs = aplicar(versao, por_cliente.get(cid, []), cadastro[cid], leituras, cfg.legibility_min_confidence)
+        docs = aplicar(versao, por_cliente.get(cid, []), cadastro[cid], leituras, LIMITE_CONFIANCA)
         d = decidir(cadastro[cid], docs, cfg, prior_legibility_failures=0)
         esperado = (g["expected_decision"], g["expected_reason"] or None)
         if (d.decision, d.main_reason) != esperado:
@@ -136,12 +148,16 @@ def avaliar_fotos(versao, fotos, extracoes, oracle, cadastro, gabarito, document
     certas, erros, barradas = 0, [], []
     for foto in fotos:
         cid = foto["applicant_id"]
-        doc = documento_da_extracao(foto["file"], extracoes[foto["file"]])
-        if not legivel(versao, doc, cadastro[cid], leituras, cfg.legibility_min_confidence) \
-                and foto["expected_legible"] == "yes":
+        palavras = leituras.get(foto["file"], {}).get(0, {}).get("words")
+        doc = documento_da_extracao(foto["file"], extracoes[foto["file"]], palavras)
+        if versao == "final":
+            barrada = legibility.avaliar(doc, cfg).status != "pass"
+        else:
+            barrada = not legivel(versao, doc, cadastro[cid], leituras, LIMITE_CONFIANCA)
+        if barrada and foto["expected_legible"] == "yes":
             barradas.append(foto["file"])
         outros = [d for d in oracle[cid] if d.file != foto["source_file"]]
-        docs = aplicar(versao, outros + [doc], cadastro[cid], leituras, cfg.legibility_min_confidence)
+        docs = aplicar(versao, outros + [doc], cadastro[cid], leituras, LIMITE_CONFIANCA)
         d = decidir(cadastro[cid], docs, cfg, prior_legibility_failures=0)
         esperado = decisao_esperada(foto, gabarito[cid], documentos[foto["source_file"]], True)
         if (d.decision, d.main_reason) == esperado:
@@ -163,9 +179,9 @@ def main():
     gabarito_lista = ler_csv_bom(RAIZ / "data" / "ground_truth.csv")
     gabarito = {g["applicant_id"]: g for g in gabarito_lista}
     documentos = {d["file"]: d for d in ler_csv(RAIZ / "data" / "documents.csv")}
-    confiancas = carregar_confiancas()
-    oracle, _ = documentos_oracle(confiancas)
-    cache, faltando = documentos_cache(args.prompt, args.model, confiancas)
+    palavras = carregar_palavras()
+    oracle, _ = documentos_oracle(palavras)
+    cache, faltando = documentos_cache(args.prompt, args.model, palavras)
     if faltando:
         sys.exit(f"Documentos v1 sem extração no cache: {', '.join(faltando)}")
     fotos = [f for f in ler_csv(RAIZ / "data" / "photos.csv") if f["expected_legible"]]
@@ -184,8 +200,8 @@ def main():
 
     total_v1, total_fotos = len(gabarito_lista), len(fotos)
     md = [f"# Comparação dos porteiros de legibilidade · {args.prompt} · {args.model}", "",
-          f"Gerado por `evaluation/compare_gates.py`, sem chamadas à API. Limite de confiança: "
-          f"{cfg.legibility_min_confidence:g}; piso de palavras: {PISO_PALAVRAS}; competência a no máximo "
+          f"Gerado por `evaluation/compare_gates.py`, sem chamadas à API. Limite de confiança (atual e a): "
+          f"{LIMITE_CONFIANCA:g}; piso de palavras: {PISO_PALAVRAS}; competência a no máximo "
           f"{MESES_COMPETENCIA} meses. Decisão certa = decisão e motivo principal certos.", "",
           "| Versão | v1 oracle | v1 cache | Fotos | Fotos legíveis barradas (falso negativo) |", "|---|---|---|---|---|"]
     for l in linhas:

@@ -37,7 +37,7 @@ flowchart TD
     F["Front end (Streamlit)<br/>applicant data, income multiplier, documents"] --> OCR
     E["Eval<br/>fictional test set"] --> OCR
     subgraph N["Shared core"]
-        OCR["OCR (Tesseract)<br/>text + confidence"] --> X["Extraction (Gemini)<br/>JSON with classified line items"]
+        OCR["OCR (Tesseract)<br/>text + word count"] --> X["Extraction (Gemini)<br/>JSON with classified line items"]
         X <--> C[("Extraction cache")]
         X --> V["JSON validation<br/>guardrails"]
         V --> M["Rules engine<br/>computes and decides"]
@@ -61,7 +61,7 @@ Every decision, with its rationale and the alternatives discarded, is logged in 
 1. **Prompting + a rules engine instead of fine-tuning or RAG.** The rules are few, stable and fit in the prompt; fine-tuning would require a dataset labeled line by line and retraining for every rule change.
 2. **v1 covers pay stubs only.** Bank statements have an open problem (telling the income of someone who sells as an individual apart from a one-off transfer) and were moved to v2. Any other file is rejected with a single, actionable message: "we currently accept pay stubs only".
 3. **Humans review approvals, not rejections.** This focuses analysts where the credit risk is, but makes the **false negative** (rejecting someone who should pass) the critical error, because nobody reviews it. That's why automatic rejection only happens with high certainty.
-4. **Legibility measured by OCR confidence, not by the LLM's self-assessment.** A stable numeric signal can be calibrated; the model's opinion about its own reading can't.
+4. **Legibility decided by code from checkable signals, not by the LLM's self-assessment.** A document is unreadable when the OCR finds no words and the LLM extracts nothing, or when the CPF fails its check digits. The OCR's average confidence was tried first and dropped: on real photos it blocked documents the LLM read correctly.
 5. **Public demo without uploads.** The demo uses only fictional documents with cached extractions: zero cost, no risk of receiving real documents, and instant responses.
 
 ## How I evaluate it
@@ -118,7 +118,7 @@ Python · Gemini API (free tier, Flash models) · Tesseract OCR · Streamlit · 
    tesseract --list-langs     # must list "por"
    ```
 
-Versions used to calibrate the legibility threshold: **Tesseract 5.5.3** (Leptonica 1.87.0), Portuguese model from the **`tesseract-por` 4.1.0** port (standard `tessdata` family), page segmentation `--psm 3`. OCR confidence changes with the Tesseract version or the language model, so the threshold in `config/default_rules.yaml` must be recalibrated if either changes. `core/ocr.py` finds the binary on the `PATH` or in `/opt/local/bin`; set `TESSERACT_CMD` to use another location.
+Versions used for the OCR word count: **Tesseract 5.5.3** (Leptonica 1.87.0), Portuguese model from the **`tesseract-por` 4.1.0** port (standard `tessdata` family), page segmentation `--psm 3`. The word count can change with the Tesseract version or the language model; rerun the evals if either changes. `core/ocr.py` finds the binary on the `PATH` or in `/opt/local/bin`; set `TESSERACT_CMD` to use another location.
 
 ```bash
 # 1. Create the virtual environment and install the pinned dependencies

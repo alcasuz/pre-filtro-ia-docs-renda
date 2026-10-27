@@ -1,7 +1,7 @@
 # Test set scenarios (v1: pay stub)
 
 > 100% fictional data. Invented names, CPFs, companies and CNPJs; CPFs randomly generated with valid check digits, unrelated to real people. Document content (names, line-item descriptions) stays in Portuguese, as on real Brazilian pay stubs.
-> Version: v1.2 (2026-10-27)
+> Version: v1.3 (2026-10-27)
 
 ## Principles
 
@@ -82,4 +82,4 @@ For the eval, `bank_statement` and `other` are both scored as `other`, the LLM's
 ### `ground_truth.csv` (one per applicant; filled in by hand, without AI)
 `applicant_id, scenario, rule_tested, installment_amount, expected_valid_income, expected_decision (approve / reject / review), expected_reason, notes`
 
-Reason codes: `type_not_accepted`, `screen_capture`, `incomplete_document`, `id_missing`, `cpf_mismatch`, `name_mismatch`, `name_review`, `outside_window`, `non_consecutive_months`, `insufficient_income`, `illegible`, `too_many_attempts`, `suspected_fraud`. Approved applicants have an empty reason. `illegible` also covers a CPF read with invalid check digits (R2). `too_many_attempts` (an unreadable or incomplete document after 2 earlier rejections for either reason in the same request, R7 and R8) needs the request's history, which the v1 test set doesn't have: the eval runs every applicant with `prior_legibility_failures = 0`, so this path is covered by the unit tests only. `incomplete_document` (R8) has no applicant in the v1 set (every synthetic pay stub is complete): it is covered by the unit tests and by the cropped photos of test set v2.
+Reason codes: `type_not_accepted`, `screen_capture`, `incomplete_document`, `id_missing`, `cpf_mismatch`, `name_mismatch`, `name_review`, `outside_window`, `non_consecutive_months`, `insufficient_income`, `illegible`, `too_many_attempts`, `suspected_fraud`. Approved applicants have an empty reason. `illegible` also covers a CPF read with invalid check digits (R2). In oracle mode, the blurred N12 pay stub is given with every field empty, as a perfect LLM would return for an image it can't read. `too_many_attempts` (an unreadable or incomplete document after 2 earlier rejections for either reason in the same request, R7 and R8) needs the request's history, which the v1 test set doesn't have: the eval runs every applicant with `prior_legibility_failures = 0`, so this path is covered by the unit tests only. `incomplete_document` (R8) has no applicant in the v1 set (every synthetic pay stub is complete): it is covered by the unit tests and by the cropped photos of test set v2.

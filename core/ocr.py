@@ -1,12 +1,12 @@
-"""OCR com o Tesseract: confiança média das palavras de uma imagem (sinal de legibilidade da R7).
+"""OCR com o Tesseract: número de palavras reconhecidas e confiança média de uma imagem.
 
-A confiança média é a média simples da confiança (0 a 100) de cada palavra que o
-Tesseract reconheceu, ignorando as caixas sem texto (conf = -1). Imagem sem
-nenhuma palavra reconhecida tem confiança 0.
+O sinal de legibilidade da R7 é o número de palavras (zero palavras e nada
+extraído pelo LLM = ilegível). A confiança média (média simples da confiança, de
+0 a 100, de cada palavra reconhecida, ignorando as caixas sem texto) continua
+registrada para análise, mas não decide mais nada.
 
-A confiança depende da versão do Tesseract e do modelo de idioma; ambos são
-registrados junto com o resultado, porque o limite de legibilidade só vale para
-a combinação em que foi calibrado.
+Os dois dependem da versão do Tesseract e do modelo de idioma; ambos são
+registrados junto com o resultado.
 
 Uso:
   .venv/bin/python -m core.ocr            # base v1 (data/documents.csv) -> cache/ocr/confidence.csv
@@ -64,6 +64,12 @@ def carregar_confiancas(caminho=ARQUIVO_CONFIANCAS):
     """{arquivo: confiança média} a partir do cache gerado por main()."""
     with open(caminho, newline="", encoding="utf-8") as f:
         return {linha["file"]: float(linha["mean_confidence"]) for linha in csv.DictReader(f)}
+
+
+def carregar_palavras(caminho=ARQUIVO_CONFIANCAS):
+    """{arquivo: número de palavras reconhecidas} a partir do cache gerado por main()."""
+    with open(caminho, newline="", encoding="utf-8") as f:
+        return {linha["file"]: int(linha["words"]) for linha in csv.DictReader(f)}
 
 
 def main():

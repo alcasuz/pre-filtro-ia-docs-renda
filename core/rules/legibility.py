@@ -1,20 +1,24 @@
 """R7 (legibilidade): documento ilegível reprova, com orientação para reenviar.
 
-O sinal é a confiança média das palavras no OCR (core/ocr.py): abaixo de
-legibility_min_confidence, o documento é ilegível; no limite exato, é legível.
-Sem confiança de OCR (o OCR não conseguiu ler) também é falha de legibilidade.
-Um CPF lido com dígitos verificadores inválidos também (R2): é sinal de leitura
-errada, não de outro titular, então não vira cpf_mismatch.
+Um documento é ilegível se:
+1. o OCR não reconhece nenhuma palavra E o LLM não extrai nenhum campo (todos
+   null e nenhuma linha de provento): motivo illegible. Sem OCR (None) conta como
+   zero palavras. A confiança média do OCR não é usada: em fotos reais ela barrava documentos que o LLM lia bem
+   (ex.: imagem de cabeça para baixo);
+2. o CPF lido tem dígitos verificadores inválidos (R2): sinal de leitura errada,
+   não de outro titular; motivo illegible.
 
 Fallback, no nível do pedido: falhas_anteriores é quantas reprovações por
-ilegibilidade o pedido já teve (informado por quem chama o motor). Se esta é a
-tentativa max_legibility_attempts ou além, a falha vai para revisão humana
-(too_many_attempts) em vez de reprovar de novo, para quem não consegue gerar uma
-imagem legível não ficar preso.
+ilegibilidade (qualquer critério acima) ou documento incompleto o pedido já teve,
+informado por quem chama o motor. Se esta é a tentativa max_legibility_attempts
+ou além, a falha vai para revisão humana (too_many_attempts) em vez de reprovar de
+novo, para quem não consegue gerar uma imagem legível não ficar preso.
 """
 
 from ..models import PASS, REJECT, REVIEW, ResultadoRegra
 from .identification import cpf_valido, normalizar_cpf
+
+CAMPOS_LIDOS = ("pay_period", "name_on_doc", "cpf_on_doc", "total_earnings", "total_deductions", "net_pay")
 
 
 def status_da_falha(motivo, config, falhas_anteriores):
@@ -27,16 +31,19 @@ def status_da_falha(motivo, config, falhas_anteriores):
     return REJECT, motivo
 
 
-def avaliar(doc, config, falhas_anteriores=0):
-    detalhes = {"ocr_confidence": doc.ocr_confidence, "min_confidence": config.legibility_min_confidence,
-                "prior_legibility_failures": falhas_anteriores, "max_attempts": config.max_legibility_attempts}
-    if doc.ocr_confidence is None:
-        legivel, detalhes["criterion"] = False, "ocr_unavailable"
-    else:
-        legivel, detalhes["criterion"] = doc.ocr_confidence >= config.legibility_min_confidence, "ocr_confidence"
-    cpf = normalizar_cpf(doc.cpf_on_doc)
-    if legivel and cpf and not cpf_valido(cpf):
-        legivel, detalhes["criterion"] = False, "cpf_check_digits"
+def extraiu_algo(doc):
+    return bool(doc.earnings_lines) or any(getattr(doc, c) not in (None, "") for c in CAMPOS_LIDOS)
 
-    status, motivo = (PASS, None) if legivel else status_da_falha("illegible", config, falhas_anteriores)
+
+def avaliar(doc, config, falhas_anteriores=0):
+    detalhes = {"ocr_words": doc.ocr_words, "prior_legibility_failures": falhas_anteriores,
+                "max_attempts": config.max_legibility_attempts}
+    cpf = normalizar_cpf(doc.cpf_on_doc)
+    if not doc.ocr_words and not extraiu_algo(doc):
+        motivo, detalhes["criterion"] = "illegible", "ocr_and_llm_empty"
+    elif cpf and not cpf_valido(cpf):
+        motivo, detalhes["criterion"] = "illegible", "cpf_check_digits"
+    else:
+        return ResultadoRegra(rule="legibility", file=doc.file, status=PASS, details=detalhes)
+    status, motivo = status_da_falha(motivo, config, falhas_anteriores)
     return ResultadoRegra(rule="legibility", file=doc.file, status=status, reason=motivo, details=detalhes)

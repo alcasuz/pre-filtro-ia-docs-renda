@@ -9,7 +9,7 @@ flowchart TD
     F["Front end (Streamlit)<br/>applicant data, config, documents"] --> OCR
     E["Eval<br/>test set CSVs, default config"] --> OCR
     subgraph N["Shared core"]
-        OCR["OCR (Tesseract)<br/>text + confidence"] --> X["Extraction (Gemini)<br/>JSON with classified line items"]
+        OCR["OCR (Tesseract)<br/>text + word count"] --> X["Extraction (Gemini)<br/>JSON with classified line items"]
         X <--> C[("Extraction cache")]
         X --> V["JSON validation<br/>format guardrails"]
         V --> M["Rules engine<br/>computes and decides"]
@@ -34,7 +34,7 @@ The engine (`core/engine.py`) is a pure function: it keeps no state between call
 | Input | Who provides it | Front end | Eval |
 |---|---|---|---|
 | Applicant record, including `analysis_date` | caller (`Cliente`) | today's date | fixed date from `applicants.csv` |
-| Documents (extraction, including `capture_type` from prompt v3, + OCR confidence) | caller (`Documento` list) | extraction and OCR of the uploaded files | cached extraction (or the ground truth, in oracle mode) + `cache/ocr/confidence.csv` |
+| Documents (extraction, including `capture_type` from prompt v3, + OCR word count) | caller (`Documento` list) | extraction and OCR of the uploaded files | cached extraction (or the ground truth, in oracle mode) + `cache/ocr/confidence.csv` |
 | `prior_legibility_failures` | caller (request history) | number of rejections for an unreadable or incomplete document this request already had | always 0 (the test set has no history) |
 | Rule parameters | `config/default_rules.yaml` | default file, multiplier editable | default file, version recorded in each report |
 

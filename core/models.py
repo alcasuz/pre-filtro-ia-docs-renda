@@ -35,8 +35,8 @@ class Documento:
     earnings_lines: list[Linha]
     fraud_suspected: bool
     fraud_reason: Optional[str] = None
-    # Confiança média das palavras no OCR (0 a 100), sinal de legibilidade da R7.
-    ocr_confidence: Optional[float] = None
+    # Número de palavras que o OCR reconheceu, sinal de legibilidade da R7 (None = sem OCR).
+    ocr_words: Optional[int] = None
     # original_file, photo_of_paper, photo_of_screen ou screenshot; None em extrações
     # anteriores ao prompt v3, que não informam a captura.
     capture_type: Optional[str] = None

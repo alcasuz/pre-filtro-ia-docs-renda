@@ -16,83 +16,84 @@ from .helpers import CONFIG, CPF, cliente, d, documento_vazio, holerite, tres_me
 # ---------------------------------------------------------------------------
 # R7: legibilidade
 # ---------------------------------------------------------------------------
+def leg(doc, falhas=0, cfg=CONFIG):
+    return legibility.avaliar(doc, cfg, falhas)
 
-@pytest.mark.parametrize("confianca, status", [
-    (0.0, REJECT),      # N12: nenhuma palavra reconhecida
-    (29.99, REJECT),
-    (30.0, PASS),       # borda: exatamente no limite é legível
-    (30.01, PASS),
-    (62.91, PASS),      # pior holerite legível da base (A16 torto)
+
+def test_documento_legivel_passa():
+    r = leg(holerite())
+    assert (r.status, r.reason) == (PASS, None)
+
+
+@pytest.mark.parametrize("palavras", [0, None])
+def test_ocr_sem_palavras_e_llm_sem_nada_e_ilegivel(palavras):
+    # N12: imagem desfocada; None = OCR indisponível conta como zero palavras.
+    r = leg(documento_vazio(tipo="payslip", palavras=palavras))
+    assert (r.status, r.reason, r.details["criterion"]) == (REJECT, "illegible", "ocr_and_llm_empty")
+
+
+def test_ocr_sem_palavras_mas_llm_leu_e_legivel():
+    # Ex.: foto cortada ou girada em que o Tesseract não lê nada, mas o LLM lê.
+    assert leg(holerite(palavras=0)).status == PASS
+
+
+@pytest.mark.parametrize("campo, kwargs", [
+    ("pay_period", {"periodo": "2026-09"}),
+    ("name_on_doc", {"nome": "OTÁVIO OLIVEIRA ARAÚJO"}),
+    ("cpf_on_doc", {"cpf": "782.943.622-39"}),
+    ("total_earnings", {"totais": ("3000.00", None, None)}),
+    ("net_pay", {"totais": (None, None, "2750.00")}),
+    ("earnings_lines", {"linhas": [Linha("SALÁRIO BASE", Decimal("3000.00"), True)]}),
 ])
-def test_legibilidade_pela_confianca_do_ocr(confianca, status):
-    r = legibility.avaliar(holerite(ocr=confianca), CONFIG)
-    assert r.status == status
-    assert r.reason == (None if status == PASS else "illegible")
-    assert r.details["ocr_confidence"] == confianca
+def test_um_campo_extraido_basta_para_nao_ser_ilegivel_pelo_ocr(campo, kwargs):
+    vazio = dict(periodo=None, nome=None, cpf=None, totais=(None, None, None), linhas=[], palavras=0)
+    assert leg(holerite(**{**vazio, **kwargs})).status == PASS
 
 
-def test_documento_nao_holerite_com_tudo_nulo_mas_legivel_passa_na_legibilidade():
-    # Ex.: N01, a conta de luz: o LLM devolve other com tudo nulo, mas o OCR lê bem.
-    assert legibility.avaliar(documento_vazio(ocr=84.86), CONFIG).status == PASS
-
-
-def test_limite_de_legibilidade_vem_da_configuracao():
-    from dataclasses import replace
-    r = legibility.avaliar(holerite(ocr=50.0), replace(CONFIG, legibility_min_confidence=60.0))
-    assert r.status == REJECT
-
-
-def test_ocr_sem_confianca_e_falha_de_legibilidade():
-    r = legibility.avaliar(holerite(ocr=None), CONFIG)
-    assert (r.status, r.reason, r.details["criterion"]) == (REJECT, "illegible", "ocr_unavailable")
-
-
-@pytest.mark.parametrize("falhas_anteriores, status, motivo", [
-    (0, REJECT, "illegible"),
-    (1, REJECT, "illegible"),
-    (2, REVIEW, "too_many_attempts"),   # borda: com 2 falhas anteriores, a nova falha vai para revisão
-    (5, REVIEW, "too_many_attempts"),
-])
-def test_falhas_anteriores_de_legibilidade_no_pedido(falhas_anteriores, status, motivo):
-    r = legibility.avaliar(holerite(ocr=12.0), CONFIG, falhas_anteriores)
-    assert (r.status, r.reason, r.details["prior_legibility_failures"]) == (status, motivo, falhas_anteriores)
-
-
-def test_padrao_sem_falhas_anteriores():
-    assert legibility.avaliar(holerite(ocr=12.0), CONFIG).reason == "illegible"
-
-
-def test_falhas_anteriores_valem_tambem_quando_o_ocr_nao_le():
-    r = legibility.avaliar(holerite(ocr=None), CONFIG, 2)
-    assert (r.status, r.reason) == (REVIEW, "too_many_attempts")
-
-
-def test_documento_legivel_com_falhas_anteriores_passa():
-    assert legibility.avaliar(holerite(ocr=80.0), CONFIG, 2).status == PASS
-
-
-def test_numero_de_tentativas_vem_da_configuracao():
-    from dataclasses import replace
-    r = legibility.avaliar(holerite(ocr=12.0), replace(CONFIG, max_legibility_attempts=5), 2)
-    assert r.reason == "illegible"
+def test_ocr_com_palavras_e_llm_sem_nada_e_legivel():
+    # N01: conta de luz lida pelo OCR; o LLM devolve other com tudo nulo (decide o tipo, R1).
+    assert leg(documento_vazio(palavras=120)).status == PASS
 
 
 @pytest.mark.parametrize("cpf_doc", ["816.425.287-26", "782.943.622-38", "782.943.622", "111.111.111-11"])
 def test_cpf_com_digitos_invalidos_e_ilegivel(cpf_doc):
-    # Leitura errada do CPF (ex.: foto tremida), não outro titular: OCR alto não salva.
-    r = legibility.avaliar(holerite(cpf=cpf_doc, ocr=88.0), CONFIG)
+    # Leitura errada do CPF (ex.: foto tremida), não outro titular.
+    r = leg(holerite(cpf=cpf_doc))
     assert (r.status, r.reason, r.details["criterion"]) == (REJECT, "illegible", "cpf_check_digits")
 
 
 @pytest.mark.parametrize("cpf_doc", ["782.943.622-39", "529.982.247-25", None, ""])
 def test_cpf_valido_ou_ausente_nao_afeta_a_legibilidade(cpf_doc):
     # Um CPF válido de outra pessoa é cpf_mismatch (R2), não ilegível.
-    assert legibility.avaliar(holerite(cpf=cpf_doc), CONFIG).status == PASS
+    assert leg(holerite(cpf=cpf_doc)).status == PASS
 
 
-def test_cpf_invalido_tambem_usa_o_fallback_de_tentativas():
-    r = legibility.avaliar(holerite(cpf="782.943.622-38"), CONFIG, 2)
-    assert (r.status, r.reason) == (REVIEW, "too_many_attempts")
+@pytest.mark.parametrize("periodo", ["2020-08", "2027-11", "2026-01", None, "set/2026"])
+def test_competencia_nao_e_criterio_de_legibilidade(periodo):
+    # Competência distante, ausente ou mal formatada fica para a R3 (período) e a R8 (incompleto).
+    assert leg(holerite(periodo=periodo)).status == PASS
+
+
+@pytest.mark.parametrize("doc", [
+    documento_vazio(tipo="payslip", palavras=0),
+    holerite(cpf="782.943.622-38"),
+], ids=["ocr_e_llm_vazios", "cpf_invalido"])
+@pytest.mark.parametrize("falhas_anteriores, status", [(0, REJECT), (1, REJECT), (2, REVIEW), (5, REVIEW)])
+def test_os_dois_criterios_usam_o_mesmo_contador(doc, falhas_anteriores, status):
+    r = leg(doc, falhas_anteriores)
+    assert r.status == status
+    if status == REVIEW:
+        assert r.reason == "too_many_attempts"
+
+
+def test_documento_legivel_com_falhas_anteriores_passa():
+    assert leg(holerite(), 2).status == PASS
+
+
+def test_numero_de_tentativas_vem_da_configuracao():
+    from dataclasses import replace
+    r = leg(holerite(cpf="782.943.622-38"), 2, replace(CONFIG, max_legibility_attempts=5))
+    assert r.reason == "illegible"
 
 
 # ---------------------------------------------------------------------------
