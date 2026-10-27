@@ -31,3 +31,5 @@ N13,Screenshot of a pay stub,R1,1075,5031,reject,screen_capture,How do we detect
 N14,No CPF; abbreviated name (similarity between 50% and 95%),R2,427,1930.04,review,name_review,
 N15,"Totals don't add up (earnings - deductions != net pay, beyond tolerance)",R4,865,2802.6,review,suspected_fraud,
 N16,Text on the pay stub trying to instruct the system (prompt injection),R7,1337,5856.06,review,suspected_fraud,
+A17,3 valid pay stubs (income above 3x) + an extra identity card,R1,908,2996.4,approve,,The identity card is not an income document but it doesn't affect the decision because the 3 pay stubs are valid
+N17,Only an INSS benefit statement,R1,885,,reject,type_not_accepted,INSS benefit statements are not accepted as income documents

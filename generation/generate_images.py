@@ -902,15 +902,26 @@ def gerar_mosaico(documentos):
     salvar(mosaico, PASTA_IMAGENS / ARQUIVO_AMOSTRA)
 
 
+# Documentos desenhados por generate_non_payslips.py (A17, N17 e os exemplos sem cliente).
+CLIENTES_DE_OUTRO_SCRIPT = ("A17", "N17")
+PREFIXO_DE_OUTRO_SCRIPT = "X_"
+AMOSTRAS_DE_OUTRO_SCRIPT = {"_sample_non_payslips.png"}
+
+
+def de_outro_script(doc):
+    return doc["applicant_id"] in CLIENTES_DE_OUTRO_SCRIPT or doc["file"].startswith(PREFIXO_DE_OUTRO_SCRIPT)
+
+
 def main():
-    documentos = ler("documents.csv")
+    todos = ler("documents.csv")
+    documentos = [d for d in todos if not de_outro_script(d)]
     linhas = defaultdict(list)
     for linha in ler("line_items.csv"):
         linhas[linha["file"]].append(linha)
     salarios = salarios_contratuais(documentos, linhas)
 
     PASTA_IMAGENS.mkdir(parents=True, exist_ok=True)
-    esperados = {doc["file"] for doc in documentos} | {ARQUIVO_AMOSTRA}
+    esperados = {doc["file"] for doc in todos} | {ARQUIVO_AMOSTRA} | AMOSTRAS_DE_OUTRO_SCRIPT
     antigos = [p for p in PASTA_IMAGENS.glob("*.png") if p.name not in esperados]
     for caminho in antigos:
         caminho.unlink()
