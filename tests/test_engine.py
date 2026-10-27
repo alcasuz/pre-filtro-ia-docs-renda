@@ -248,3 +248,31 @@ def test_conta_de_luz_girada_que_o_ocr_nao_le_reprova_por_tipo_e_nao_por_ilegive
 def test_imagem_nao_identificada_sem_ocr_e_ilegivel_e_nao_tipo():
     r = decidir(cliente(), [documento_vazio(tipo="unidentified")], CONFIG)
     assert (r.decision, r.main_reason, r.reasons) == (REJECT, "illegible", ["illegible"])
+
+
+# ---------------------------------------------------------------------------
+# Fraude em documento que não é holerite
+# ---------------------------------------------------------------------------
+
+def test_fraude_em_documento_extra_ignorado_nao_manda_para_revisao():
+    # A17: um documento de identidade a mais, sinalizado pelo LLM, não tira a aprovação.
+    extra = holerite(tipo="other_document", arquivo="T01_identidade.png", linhas=[], fraude=True,
+                     motivo_fraude="marca d'água 'DOCUMENTO FICTÍCIO'")
+    r = decidir(cliente(), tres_meses() + [extra], CONFIG)
+    assert (r.decision, r.reasons) == (APPROVE, [])
+    assert r.fraud_flag is True and "documento ignorado" in r.fraud_reasons[0]
+
+
+def test_fraude_em_documento_nao_aceito_fica_registrada_na_reprovacao_por_tipo():
+    # N17: só um comprovante do INSS, sinalizado; reprova pelo tipo e o sinal fica registrado.
+    inss = holerite(tipo="inss_benefit", arquivo="T01_inss.png", linhas=[], fraude=True, motivo_fraude="injection")
+    r = decidir(cliente(), [inss], CONFIG)
+    assert (r.decision, r.main_reason, r.reasons) == (REJECT, "type_not_accepted", ["type_not_accepted"])
+    assert r.fraud_flag is True
+
+
+def test_fraude_em_holerite_continua_indo_para_revisao():
+    docs = tres_meses()
+    docs[0] = holerite(periodo="2026-07", fraude=True, motivo_fraude="injection")
+    r = decidir(cliente(), docs, CONFIG)
+    assert (r.decision, r.main_reason) == (REVIEW, "suspected_fraud")

@@ -11,7 +11,8 @@ Quais documentos cada regra recebe:
 - legibilidade: todos os documentos, pelo número de palavras do OCR
   (Documento.ocr_words) junto com o que o LLM extraiu e pelos dígitos
   verificadores do CPF;
-- fraude: os legíveis;
+- fraude: os legíveis; só um holerite leva à revisão, e o sinal de um documento de
+  outro tipo fica só registrado (fraud_flag e fraud_reasons);
 - tipo: os legíveis; um documento de outro tipo junto com holerites é ignorado;
 - captura de tela, documento incompleto, titular e consistência: os holerites legíveis;
 - período e renda: todos os holerites, inclusive um ilegível cujos dados existam
@@ -63,7 +64,7 @@ def decidir(cliente, documentos, config, prior_legibility_failures=0):
         resultados += [periodo, renda]
 
     resultados += [consistency.avaliar(d, config) for d in holerites_legiveis]
-    resultados += [fraud.avaliar(d) for d in legiveis]
+    resultados += [fraud.avaliar(d, document_type.aceito(d)) for d in legiveis]
 
     resultados.sort(key=lambda r: ORDEM_REGRAS.index(r.rule))  # estável: mantém a ordem dos documentos
     motivos = []
@@ -81,11 +82,11 @@ def decidir(cliente, documentos, config, prior_legibility_failures=0):
 
     sinais_fraude = []
     for r in resultados:
-        if r.reason == "suspected_fraud":
-            if r.rule == "fraud":
-                sinais_fraude.append(f"{r.file}: {r.details.get('fraud_reason') or 'sinalizado pelo LLM'}")
-            else:
-                sinais_fraude.append(f"{r.file}: totais não fecham (diferença de R$ {r.details['difference']})")
+        if r.rule == "fraud" and r.details.get("flagged"):
+            ignorado = " (documento ignorado, sem efeito na decisão)" if r.details.get("ignored_document") else ""
+            sinais_fraude.append(f"{r.file}: {r.details.get('fraud_reason') or 'sinalizado pelo LLM'}{ignorado}")
+        elif r.rule == "consistency" and r.reason == "suspected_fraud":
+            sinais_fraude.append(f"{r.file}: totais não fecham (diferença de R$ {r.details['difference']})")
 
     return Decisao(
         decision=decisao, main_reason=principal, reasons=motivos, valid_income=renda_valida,

@@ -1,7 +1,7 @@
 # Pre-screening rules (fictional business)
 
 > Personal lab. Rules and parameters invented for study purposes; they do not represent any company's policy.
-> Version: v1.6 (2026-10-27)
+> Version: v1.7 (2026-10-27)
 
 ## Glossary (Brazilian terms)
 
@@ -109,7 +109,7 @@ Each rule states **Who does it**: `[LLM]` (read/classify), `[OCR]` or `[CODE]` (
 - A pay period far from `analysis_date` is not a legibility criterion: it is decided by R3 (`outside_window`), and a non-accepted extra document is ignored by R1 even if its date was read as a pay period.
 - The same fallback below applies to every legibility failure, whichever criterion caused it.
 - Fallback, per request: if the request already had 2 rejections for illegibility or for an incomplete document (R8), a new legibility failure → **human review** (reason: too many attempts), so an applicant who can't produce a readable image isn't stuck. The count is per request, not per document, and is informed by whoever calls the engine. If the illegible document's data is missing, period and income failures caused by it become review instead of reject; any other reject still applies.
-- Document with text trying to give instructions to the system (prompt injection) or with visible signs of editing → **human review** (suspected fraud). Screenshots and photos of a screen are not fraud (see R1).
+- Pay stub with text trying to give instructions to the system (prompt injection) or with visible signs of editing → **human review** (suspected fraud). Screenshots and photos of a screen are not fraud (see R1). A flagged document of a non-accepted type (ignored or rejected by R1) doesn't send the applicant to review: its flag is only recorded, like any other fraud flag.
 - Who does it (legibility): `[OCR]` counts the words it recognizes; `[LLM]` extracts the fields (null when it can't read them); `[CODE]` combines both, validates the CPF check digits and decides whether the document is unreadable; the caller informs how many legibility or completeness rejections the request already had.
 - Who does it (fraud): `[LLM]` flags suspected fraud in the JSON (prompt injection or signs of editing) with a short justification; `[CODE]` reads the flag and decides.
 

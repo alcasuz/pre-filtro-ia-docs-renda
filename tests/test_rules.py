@@ -443,3 +443,9 @@ def test_fraude_sinalizada_vai_para_revisao():
 
 def test_sem_fraude_passa():
     assert fraud.avaliar(holerite()).status == PASS
+
+
+def test_fraude_em_documento_nao_aceito_so_fica_registrada():
+    r = fraud.avaliar(holerite(tipo="other_document", fraude=True, motivo_fraude="marca d'água"), aceito=False)
+    assert (r.status, r.reason) == (PASS, None)
+    assert r.details == {"fraud_reason": "marca d'água", "flagged": True, "ignored_document": True}
