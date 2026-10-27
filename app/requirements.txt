@@ -1,0 +1,5 @@
+# Demo only (Streamlit Community Cloud). No Gemini SDK, no Tesseract: the demo reads the caches.
+streamlit==1.66.1
+pillow==13.0.0
+PyYAML==6.0.3
+rapidfuzz==3.14.6

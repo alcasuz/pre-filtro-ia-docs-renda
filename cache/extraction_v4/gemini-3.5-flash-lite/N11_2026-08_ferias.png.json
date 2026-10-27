@@ -1,0 +1,30 @@
+{
+  "file": "N11_2026-08_ferias.png",
+  "model": "gemini-3.5-flash-lite",
+  "prompt_version": "extraction_v4",
+  "prompt_sha256": "99fe69ab25bc1bd915d1f0da7785d471eb0bf723d1f743d1eafb272f4dcb197a",
+  "extraction": {
+    "document_type": "payslip_vacation",
+    "pay_period": "2026-08",
+    "name_on_doc": "ROGÉRIO GONÇALVES MEDEIROS",
+    "cpf_on_doc": "975.815.601-20",
+    "total_earnings": 1687.76,
+    "total_deductions": 129.13,
+    "net_pay": 1558.63,
+    "earnings_lines": [
+      {
+        "description": "FÉRIAS (20 DIAS)",
+        "amount": 1265.82,
+        "counts_as_income": true
+      },
+      {
+        "description": "1/3 CONSTITUCIONAL DE FÉRIAS",
+        "amount": 421.94,
+        "counts_as_income": false
+      }
+    ],
+    "fraud_suspected": false,
+    "fraud_reason": null,
+    "capture_type": "original_file"
+  }
+}

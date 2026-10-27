@@ -73,8 +73,8 @@ PASTA_RESULTADOS = Path(__file__).resolve().parent / "results"
 CAMPOS = ["document_type"] + CAMPOS_TEXTO + CAMPOS_VALOR + ["fraud_suspected"]
 # Reprovações que pedem um novo envio (o cliente pode se recuperar sozinho).
 RECUPERAVEIS = ("illegible", "incomplete_document")
-VISOES = (("com_captura", "Regras atuais (foto de tela reprova)"),
-          ("sem_captura", "Se a captura fosse aceita (capture_type = photo_of_paper)"))
+VISOES = (("com_captura", "Current rules (a screen photo is rejected)"),
+          ("sem_captura", "If the capture were accepted (capture_type = photo_of_paper)"))
 
 
 def ler_csv(caminho):
@@ -254,7 +254,7 @@ def tabela_por_grupo(avaliadas, chave):
         t = sum(acerto(r)[1] for r in rs)
         inv = sum(len(r["inventados"]) for r in rs)
         linhas.append(f"| {nome} | {len(rs)} | {pct(a, t)} | {inv} |")
-    return ["| Grupo | Fotos | Campos e linhas certos | Inventados |", "|---|---|---|---|"] + linhas
+    return ["| Group | Photos | Fields and lines right | Invented |", "|---|---|---|---|"] + linhas
 
 
 def resumo(r):
@@ -275,23 +275,23 @@ def resumo(r):
     tokens = {k: sum(int(l[k]) for l in ok) / len(ok) for k in ("input_tokens", "output_tokens", "thought_tokens",
                                                                  "total_tokens")} if ok else {}
     linhas = [
-        f"Fotos v2 | prompt {r['prompt']} | modelo {r['modelo']} | avaliadas (legíveis): {len(avaliadas)} "
-        f"| ilegíveis à parte: {sum(1 for x in r['resultados'] if x['foto']['expected_legible'] == 'no')}",
-        f"Campos e linhas certos: {pct(a, t)} | sem as fotos com nome do arquivo visível: {pct(al, tl)}",
-        f"Campos cortados inventados: {inv}",
+        f"Photos v2 | prompt {r['prompt']} | model {r['modelo']} | scored (readable): {len(avaliadas)} "
+        f"| unreadable, apart: {sum(1 for x in r['resultados'] if x['foto']['expected_legible'] == 'no')}",
+        f"Fields and lines right: {pct(a, t)} | without the photos showing the file name: {pct(al, tl)}",
+        f"Invented cut fields: {inv}",
     ]
     capturas = [(x["foto"]["expected_capture_type"], x["extracao"].get("capture_type"))
                 for x in r["resultados"] if x["extracao"]]
     if any(o for _, o in capturas):
-        linhas.append("capture_type certo (todas as fotos, legíveis ou não): "
+        linhas.append("capture_type right (all photos, readable or not): "
                       f"{pct(sum(e == o for e, o in capturas), len(capturas))}")
     linhas += [
-        f"Porteiro de legibilidade: legíveis barradas (falso negativo): {len(fn)}"
+        f"Legibility gate: readable photos blocked (false negative): {len(fn)}"
         + (f" ({', '.join(fn)})" if fn else "")
-        + f" | ilegíveis aprovadas: {len(fp)}" + (f" ({', '.join(fp)})" if fp else ""),
-        f"API: {len(r['log'])} chamadas | erros: {pct(len(r['log']) - len(ok), len(r['log']))} | "
-        f"latência p50 {fmt(percentil(lat, 50)) if lat else '—'} s, p90 {fmt(percentil(lat, 90)) if lat else '—'} s",
-        "Tokens médios por foto: " + " | ".join(f"{k.replace('_tokens', '')} {v:.0f}" for k, v in tokens.items()),
+        + f" | unreadable photos let through: {len(fp)}" + (f" ({', '.join(fp)})" if fp else ""),
+        f"API: {len(r['log'])} calls | errors: {pct(len(r['log']) - len(ok), len(r['log']))} | "
+        f"latency p50 {fmt(percentil(lat, 50)) if lat else '—'} s, p90 {fmt(percentil(lat, 90)) if lat else '—'} s",
+        "Average tokens per photo: " + " | ".join(f"{k.replace('_tokens', '')} {v:.0f}" for k, v in tokens.items()),
     ]
     xs = [x for x in r["resultados"] if "impacto" in x]
     if xs:
@@ -301,94 +301,94 @@ def resumo(r):
             x["impacto"][n]["obtida"] != x["impacto"][n]["sem_invencao"] for n in ("com_captura", "sem_captura"))]
         for n, titulo in VISOES:
             erros = Counter(classificar_erro(x, n) for x in xs)
-            linhas.append(f"Decisão do cliente com a foto, {titulo.lower()}: certas {pct(certas[n], len(xs))} | "
-                          f"reprovações recuperáveis de foto legível: {erros['recuperavel']} | "
-                          f"decisões finais erradas: {erros['final']}")
-        linhas.append(f"Invenção que muda a decisão: {len(muda)}" + (f" ({', '.join(muda)})" if muda else ""))
+            linhas.append(f"Applicant decision with the photo, {titulo[0].lower() + titulo[1:]}: right {pct(certas[n], len(xs))} | "
+                          f"recoverable rejections of readable photos: {erros['recuperavel']} | "
+                          f"wrong final decisions: {erros['final']}")
+        linhas.append(f"Inventions that change the decision: {len(muda)}" + (f" ({', '.join(muda)})" if muda else ""))
     if sem_extracao:
-        linhas.append(f"Fotos sem extração no cache: {', '.join(sem_extracao)}")
+        linhas.append(f"Photos not extracted in the cache: {', '.join(sem_extracao)}")
     return linhas
 
 
 def relatorio(r):
     avaliadas = [x for x in r["resultados"] if "campos" in x]
-    md = [f"# Avaliação das fotos (v2): {r['prompt']} · {r['modelo']}", "",
-          "Gerado por `evaluation/score_photos.py` a partir do cache, sem chamadas à API. "
-          "Gabarito: os valores do `source_file` de cada foto.", "",
-          "## Resumo", "", "```", *resumo(r), "```", ""]
+    md = [f"# Photo evaluation (v2): {r['prompt']} · {r['modelo']}", "",
+          "Generated by `evaluation/score_photos.py` from the cache, with no API calls. "
+          "Ground truth: the values of each photo's `source_file`.", "",
+          "## Summary", "", "```", *resumo(r), "```", ""]
 
-    md += ["## Por defeito", ""] + tabela_por_grupo(avaliadas, lambda x: x["foto"]["defect"]) + [""]
-    md += ["## Por defeito e intensidade", ""] + tabela_por_grupo(
+    md += ["## By defect", ""] + tabela_por_grupo(avaliadas, lambda x: x["foto"]["defect"]) + [""]
+    md += ["## By defect and intensity", ""] + tabela_por_grupo(
         avaliadas, lambda x: f"{x['foto']['defect']} · {x['foto']['severity'] or '—'}") + [""]
-    md += ["## Por severidade", ""] + tabela_por_grupo(avaliadas, lambda x: x["foto"]["severity"]) + [""]
-    md += ["## Nome do arquivo visível na foto (label_leak)", "",
-           "Nessas fotos o modelo pode ler cliente e competência na barra do visualizador.", ""]
-    md += tabela_por_grupo(avaliadas, lambda x: "com nome visível" if x["foto"]["label_leak"] == "yes"
-                           else "sem nome visível") + [""]
+    md += ["## By severity", ""] + tabela_por_grupo(avaliadas, lambda x: x["foto"]["severity"]) + [""]
+    md += ["## File name visible in the photo (label_leak)", "",
+           "In these photos the model can read the applicant and pay period in the image viewer's title bar.", ""]
+    md += tabela_por_grupo(avaliadas, lambda x: "file name visible" if x["foto"]["label_leak"] == "yes"
+                           else "file name not visible") + [""]
 
-    md += ["## Acurácia por campo", "", "| Campo | Certos |", "|---|---|"]
+    md += ["## Accuracy per field", "", "| Field | Right |", "|---|---|"]
     for campo in CAMPOS:
         pontuados = [c for x in avaliadas for c in x["campos"] if c["campo"] == campo and c["ok"] is not None]
         md.append(f"| {campo} | {pct(sum(c['ok'] for c in pontuados), len(pontuados))} |")
     todas = [l for x in avaliadas for l in x["linhas"]]
     puladas = sum(len(x["puladas"]) for x in avaliadas)
     extras = sum(len(x["extras"]) for x in avaliadas)
-    md += ["", f"Linhas de provento: {len(todas)} encontradas, {puladas} puladas, {extras} inventadas; "
-               f"valor certo {pct(sum(l['valor_ok'] for l in todas), len(todas))}; "
-               f"counts_as_income certo {pct(sum(l['conta_ok'] for l in todas), len(todas))}.", ""]
+    md += ["", f"Earnings lines: {len(todas)} found, {puladas} skipped, {extras} invented; "
+               f"amount right {pct(sum(l['valor_ok'] for l in todas), len(todas))}; "
+               f"counts_as_income right {pct(sum(l['conta_ok'] for l in todas), len(todas))}.", ""]
 
-    md += ["## Foto a foto", ""]
+    md += ["## Photo by photo", ""]
     for x in avaliadas:
         f = x["foto"]
         a, t = acerto(x)
         md += [f"### {f['file']}", "",
-               f"Defeito {f['defect']} ({f['severity']}) · nome do arquivo visível: {f['label_leak']} · "
-               f"certos {a}/{t}", "", "| Campo | Gabarito | Extraído | |", "|---|---|---|---|"]
+               f"Defect {f['defect']} ({f['severity']}) · file name visible: {f['label_leak']} · "
+               f"right {a}/{t}", "", "| Field | Ground truth | Extracted | |", "|---|---|---|---|"]
         for c in x["campos"]:
-            marca = "parcial" if c["ok"] is None else ("✓" if c["ok"] else "✗")
+            marca = "partial" if c["ok"] is None else ("✓" if c["ok"] else "✗")
             md.append(f"| {c['campo']} | {fmt(c['esperado'])} | {fmt(c['obtido'])} | {marca} |")
         for l in x["linhas"]:
             o = l["obtido"]
-            md.append(f"| linha: {l['descricao']} | | {o['description']!r} {fmt(o['amount'])} "
+            md.append(f"| line: {l['descricao']} | | {o['description']!r} {fmt(o['amount'])} "
                       f"conta={fmt(o['counts_as_income'])} | {'✓' if l['valor_ok'] and l['conta_ok'] else '✗'} |")
         for g in x["puladas"]:
-            md.append(f"| linha pulada: {g['description']} | {g['amount']} | — | ✗ |")
+            md.append(f"| skipped line: {g['description']} | {g['amount']} | — | ✗ |")
         for o in x["extras"]:
-            md.append(f"| linha inventada | — | {o['description']!r} {fmt(o['amount'])} | ✗ |")
+            md.append(f"| invented line | — | {o['description']!r} {fmt(o['amount'])} | ✗ |")
         if x["inventados"]:
             md.append("")
-            md.append("Inventados nos campos cortados: " + "; ".join(f"{c} = {fmt(v)}" for c, v in x["inventados"]))
+            md.append("Invented in the cut fields: " + "; ".join(f"{c} = {fmt(v)}" for c, v in x["inventados"]))
         md.append("")
 
     capturas = Counter((x["foto"]["expected_capture_type"], x["extracao"].get("capture_type"))
                        for x in r["resultados"] if x["extracao"])
     if any(o for _, o in capturas):
-        md += ["## Matriz de confusão do capture_type", "",
-               "Todas as fotos extraídas, inclusive as ilegíveis. Linhas: expected_capture_type. Colunas: extraído.", ""]
+        md += ["## capture_type confusion matrix", "",
+               "All extracted photos, unreadable ones included. Rows: expected_capture_type. Columns: extracted.", ""]
         md += tabela_captura(capturas) + [""]
         alarmes = [x["foto"]["file"] for x in r["resultados"] if x["extracao"]
                    and x["foto"]["expected_capture_type"] == "photo_of_paper"
                    and x["extracao"].get("capture_type") in CAPTURAS_DE_TELA]
         papel = sum(1 for x in r["resultados"] if x["extracao"] and x["foto"]["expected_capture_type"] == "photo_of_paper")
-        md += [f"**Alarme falso (foto do papel classificada como captura de tela, reprovaria por engano): "
-               f"{len(alarmes)} de {papel} fotos do papel**" + (f": {', '.join(alarmes)}" if alarmes else "")
-               + ("" if papel else " (a base ainda não tem foto do papel)"), ""]
-        md += ["| Foto | Gabarito | Extraído |", "|---|---|---|"]
+        md += [f"**False alarm (photo of paper classified as a screen capture, would be wrongly rejected): "
+               f"{len(alarmes)} of {papel} photos of paper**" + (f": {', '.join(alarmes)}" if alarmes else "")
+               + ("" if papel else " (the set has no photo of paper yet)"), ""]
+        md += ["| Photo | Ground truth | Extracted |", "|---|---|---|"]
         md += [f"| {x['foto']['file']} | {x['foto']['expected_capture_type']} | {fmt(x['extracao'].get('capture_type'))} |"
                for x in r["resultados"] if x["extracao"]] + [""]
 
-    md += ["## Fotos ilegíveis (fora da acurácia)", ""]
+    md += ["## Unreadable photos (excluded from accuracy)", ""]
     for x in r["resultados"]:
         if x["foto"]["expected_legible"] == "no":
             md += [f"**{x['foto']['file']}**", "", "```json",
                    json.dumps(x["extracao"], ensure_ascii=False, indent=2), "```", ""]
 
-    md += ["## Porteiro de legibilidade", "",
-           "Ilegível se o OCR reconhece 0 palavras e o LLM não extrai nada nem identifica o documento "
-           "(unidentified), ou se o CPF tem dígitos inválidos. "
-           "A confiança média do OCR é só informativa. "
-           "⚠️ marca legível barrada pelo porteiro (falso negativo) ou ilegível aprovada.", "",
-           "| Foto | Palavras OCR | Confiança OCR | Porteiro | Seu julgamento | LLM extraiu certo | |",
+    md += ["## Legibility gate", "",
+           "Unreadable if the OCR recognizes 0 words and the LLM extracts nothing and can't identify the document "
+           "(unidentified), or if the CPF fails its check digits. "
+           "The OCR average confidence is shown for reference only. "
+           "⚠️ marks a readable photo blocked by the gate (false negative) or an unreadable one let through.", "",
+           "| Photo | OCR words | OCR confidence | Gate | Human label | LLM fields right | |",
            "|---|---|---|---|---|---|---|"]
     sem_ocr = [x["foto"]["file"] for x in r["resultados"] if not x["ocr"]]
     for x in sorted((x for x in r["resultados"] if "porteiro" in x),
@@ -396,47 +396,47 @@ def relatorio(r):
         conf = float(x["ocr"]["mean_confidence"]) if x["ocr"] else None
         p = x["porteiro"]
         passa = p.status == "pass"
-        veredito = "legível" if passa else f"{p.reason} ({p.details['criterion']})"
+        veredito = "readable" if passa else f"{p.reason} ({p.details['criterion']})"
         legivel = x["foto"]["expected_legible"] == "yes"
         if "campos" in x:
             a, t = acerto(x)
-            llm = f"{a}/{t}" + (" (tudo)" if a == t else "")
+            llm = f"{a}/{t}" + (" (all)" if a == t else "")
         else:
-            llm = "fora da acurácia"
+            llm = "excluded from accuracy"
         alerta = "⚠️" if passa != legivel else ""
         md.append(f"| {x['foto']['file']} | {x['ocr']['words'] if x['ocr'] else '—'} | {fmt(conf)} | "
-                  f"{veredito} | {'legível' if legivel else 'ilegível'} | {llm} | {alerta} |")
+                  f"{veredito} | {'readable' if legivel else 'unreadable'} | {llm} | {alerta} |")
     if sem_ocr:
-        md += ["", "Sem OCR (rode `.venv/bin/python -m core.ocr --set v2`): " + ", ".join(sem_ocr)]
+        md += ["", "No OCR (run `.venv/bin/python -m core.ocr --set v2`): " + ", ".join(sem_ocr)]
 
     com_inv = [x for x in avaliadas if x["inventados"]]
-    md += ["", "## Campos cortados inventados e efeito na decisão", "",
-           "Decisão do motor com a extração como veio e com os campos inventados como null. "
-           "Com a regra de captura, toda foto de tela reprova antes; por isso a visão sem captura também aparece.", ""]
+    md += ["", "## Invented cut fields and their effect on the decision", "",
+           "Engine decision with the extraction as returned and with the invented fields set to null. "
+           "Under the capture rule every screen photo is rejected first, so the view without that rule is also shown.", ""]
     if com_inv:
-        md += ["| Foto | Inventados | Com captura: como veio → sem invenção | Sem captura: como veio → sem invenção | "
-               "Muda a decisão? |", "|---|---|---|---|---|"]
+        md += ["| Photo | Invented | Capture rule: as returned → without invention | No capture rule: as returned → "
+               "without invention | Changes the decision? |", "|---|---|---|---|---|"]
         for x in com_inv:
             i = x["impacto"]
             muda = [n for n in ("com_captura", "sem_captura") if i[n]["obtida"] != i[n]["sem_invencao"]]
             md.append(f"| {x['foto']['file']} | " + "; ".join(f"{c} = {fmt(v)}" for c, v in x["inventados"]) + " | "
                       + " | ".join(f"{fmt_dec(i[n]['obtida'])} → {fmt_dec(i[n]['sem_invencao'])}"
                                    for n in ("com_captura", "sem_captura"))
-                      + f" | {'sim (' + ', '.join(muda) + ')' if muda else 'não'} |")
+                      + f" | {'yes (' + ', '.join(muda) + ')' if muda else 'no'} |")
     else:
-        md.append("Nenhum.")
+        md.append("None.")
 
-    md += ["", "## Impacto na decisão do cliente", "",
-           "A foto substitui o documento de origem no cliente; os outros documentos vêm do gabarito.", ""]
-    marcas = {None: "✓", "recuperavel": "✗ recuperável", "final": "✗ final"}
+    md += ["", "## Impact on the applicant's decision", "",
+           "The photo replaces its source document in the applicant's set; the other documents come from the ground truth.", ""]
+    marcas = {None: "✓", "recuperavel": "✗ recoverable", "final": "✗ final"}
     for nome, titulo in VISOES:
         xs = [x for x in r["resultados"] if "impacto" in x]
         erros = Counter(classificar_erro(x, nome) for x in xs)
-        md += [f"### {titulo}: {pct(erros[None], len(xs))} certas", "",
-               f"- Reprovações recuperáveis de foto legível ({', '.join(RECUPERAVEIS)} quando o esperado era outro): "
-               f"{erros['recuperavel']}",
-               f"- Decisões finais erradas: {erros['final']}", "",
-               "| Foto | Esperada | Motor | |", "|---|---|---|---|"]
+        md += [f"### {titulo}: {pct(erros[None], len(xs))} right", "",
+               f"- Recoverable rejections of readable photos ({', '.join(RECUPERAVEIS)} when something else was "
+               f"expected): {erros['recuperavel']}",
+               f"- Wrong final decisions: {erros['final']}", "",
+               "| Photo | Expected | Engine | |", "|---|---|---|---|"]
         md += [f"| {x['foto']['file']} | {fmt_dec(x['impacto'][nome]['esperada'])} | "
                f"{fmt_dec(x['impacto'][nome]['obtida'])} | {marcas[classificar_erro(x, nome)]} |" for x in xs] + [""]
     return "\n".join(md) + "\n"
@@ -458,7 +458,7 @@ def main():
     destino = PASTA_RESULTADOS / f"photos_v2_{sufixo}{args.model}.md"
     destino.write_text(relatorio(r), encoding="utf-8")
     print("\n".join(resumo(r)))
-    print(f"\nRelatório completo: {destino.relative_to(RAIZ)}")
+    print(f"\nFull report: {destino.relative_to(RAIZ)}")
 
 
 if __name__ == "__main__":

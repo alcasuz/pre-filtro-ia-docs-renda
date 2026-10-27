@@ -1,0 +1,19 @@
+{
+  "file": "X_irpf_2.png",
+  "model": "gemini-3.5-flash-lite",
+  "prompt_version": "extraction_v4",
+  "prompt_sha256": "99fe69ab25bc1bd915d1f0da7785d471eb0bf723d1f743d1eafb272f4dcb197a",
+  "extraction": {
+    "document_type": "tax_return",
+    "pay_period": "2025-12",
+    "name_on_doc": "HENRIQUE FALCÃO NOGUEIRA",
+    "cpf_on_doc": "675.606.720-60",
+    "total_earnings": null,
+    "total_deductions": null,
+    "net_pay": null,
+    "earnings_lines": [],
+    "fraud_suspected": true,
+    "fraud_reason": "O documento possui uma marca d'água vermelha evidente com os dizeres 'DOCUMENTO FICTÍCIO', indicando que se trata de um documento de teste ou simulado.",
+    "capture_type": "original_file"
+  }
+}

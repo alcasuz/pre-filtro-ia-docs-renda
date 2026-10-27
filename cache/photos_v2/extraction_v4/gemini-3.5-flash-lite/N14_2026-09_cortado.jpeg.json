@@ -1,0 +1,25 @@
+{
+  "file": "N14_2026-09_cortado.jpeg",
+  "model": "gemini-3.5-flash-lite",
+  "prompt_version": "extraction_v4",
+  "prompt_sha256": "99fe69ab25bc1bd915d1f0da7785d471eb0bf723d1f743d1eafb272f4dcb197a",
+  "extraction": {
+    "document_type": "payslip",
+    "pay_period": "2026-09",
+    "name_on_doc": "ISSA M. P. CARDOSO",
+    "cpf_on_doc": null,
+    "total_earnings": 1930.04,
+    "total_deductions": 150.93,
+    "net_pay": 1779.11,
+    "earnings_lines": [
+      {
+        "description": "Salário Base",
+        "amount": 1930.04,
+        "counts_as_income": true
+      }
+    ],
+    "fraud_suspected": false,
+    "fraud_reason": null,
+    "capture_type": "photo_of_screen"
+  }
+}

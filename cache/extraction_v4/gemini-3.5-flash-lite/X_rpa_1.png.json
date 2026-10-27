@@ -1,0 +1,25 @@
+{
+  "file": "X_rpa_1.png",
+  "model": "gemini-3.5-flash-lite",
+  "prompt_version": "extraction_v4",
+  "prompt_sha256": "99fe69ab25bc1bd915d1f0da7785d471eb0bf723d1f743d1eafb272f4dcb197a",
+  "extraction": {
+    "document_type": "other_document",
+    "pay_period": "2026-09",
+    "name_on_doc": "CARLA PEREIRA TEIXEIRA",
+    "cpf_on_doc": "804.797.609-50",
+    "total_earnings": 3008.13,
+    "total_deductions": 481.3,
+    "net_pay": 2526.83,
+    "earnings_lines": [
+      {
+        "description": "Valor do serviço",
+        "amount": 3008.13,
+        "counts_as_income": false
+      }
+    ],
+    "fraud_suspected": false,
+    "fraud_reason": null,
+    "capture_type": "original_file"
+  }
+}

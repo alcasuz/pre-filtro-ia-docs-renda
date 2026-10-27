@@ -1,0 +1,19 @@
+{
+  "file": "X_fatura_cartao_2.png",
+  "model": "gemini-3.5-flash-lite",
+  "prompt_version": "extraction_v4",
+  "prompt_sha256": "99fe69ab25bc1bd915d1f0da7785d471eb0bf723d1f743d1eafb272f4dcb197a",
+  "extraction": {
+    "document_type": "bank_statement",
+    "pay_period": null,
+    "name_on_doc": "HENRIQUE MOURA SOUZA",
+    "cpf_on_doc": "495.480.038-21",
+    "total_earnings": null,
+    "total_deductions": null,
+    "net_pay": null,
+    "earnings_lines": [],
+    "fraud_suspected": false,
+    "fraud_reason": null,
+    "capture_type": "original_file"
+  }
+}

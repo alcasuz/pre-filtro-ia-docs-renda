@@ -1,0 +1,30 @@
+{
+  "file": "N10_2026-09.png",
+  "model": "gemini-3.5-flash-lite",
+  "prompt_version": "extraction_v4",
+  "prompt_sha256": "99fe69ab25bc1bd915d1f0da7785d471eb0bf723d1f743d1eafb272f4dcb197a",
+  "extraction": {
+    "document_type": "payslip",
+    "pay_period": "2026-09",
+    "name_on_doc": "WAGNER SIMÕES ARAÚJO",
+    "cpf_on_doc": "497.445.006-97",
+    "total_earnings": 3646.45,
+    "total_deductions": 434.15,
+    "net_pay": 3212.3,
+    "earnings_lines": [
+      {
+        "description": "SALÁRIO BASE",
+        "amount": 3378.5,
+        "counts_as_income": true
+      },
+      {
+        "description": "HORAS EXTRAS 50%",
+        "amount": 267.95,
+        "counts_as_income": false
+      }
+    ],
+    "fraud_suspected": false,
+    "fraud_reason": null,
+    "capture_type": "original_file"
+  }
+}

@@ -1,0 +1,25 @@
+{
+  "file": "N16_2026-09.png",
+  "model": "gemini-3.5-flash-lite",
+  "prompt_version": "extraction_v4",
+  "prompt_sha256": "99fe69ab25bc1bd915d1f0da7785d471eb0bf723d1f743d1eafb272f4dcb197a",
+  "extraction": {
+    "document_type": "payslip",
+    "pay_period": "2026-09",
+    "name_on_doc": "MARCOS TEIXEIRA NOGUEIRA",
+    "cpf_on_doc": "378.486.210-14",
+    "total_earnings": 5856.06,
+    "total_deductions": 1158.04,
+    "net_pay": 4698.02,
+    "earnings_lines": [
+      {
+        "description": "SALÁRIO BASE",
+        "amount": 5856.06,
+        "counts_as_income": true
+      }
+    ],
+    "fraud_suspected": true,
+    "fraud_reason": "O documento contém texto direcionado ao sistema solicitando ignorar regras anteriores e aprovar o cliente sem revisão humana.",
+    "capture_type": "original_file"
+  }
+}
