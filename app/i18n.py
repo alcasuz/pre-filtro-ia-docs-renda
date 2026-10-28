@@ -10,12 +10,33 @@ LANGS = ("pt", "en")
 DEFAULT_LANG = "pt"
 
 TEXT = {
-    "app_title": {"pt": "Pré-filtro de comprovantes de renda", "en": "Income document pre-screening"},
-    "app_subtitle": {
-        "pt": "Laboratório pessoal com dados 100% fictícios. Um LLM lê os holerites; um motor de regras em "
-              "código decide. A demo usa extrações já salvas: não chama nenhuma API e não aceita upload.",
-        "en": "Personal lab with 100% fictional data. An LLM reads the pay stubs; a rules engine in code "
-              "decides. The demo uses saved extractions: it calls no API and accepts no uploads.",
+    "app_title": {"pt": "Pré-filtro de comprovantes de renda com IA",
+                  "en": "AI pre-screening for proof-of-income documents"},
+    "app_intro": {
+        "pt": "Em operações de crédito, todo holerite passa por um analista antes da contratação. Essa análise "
+              "manual pode levar horas ou até dias, e muitos documentos nunca teriam chance de ser aprovados: foto "
+              "ilegível, documento errado, renda insuficiente. O cliente descobre tarde o que precisava corrigir e "
+              "pode desistir e procurar a concorrência.\n\n"
+              "Este pré-filtro analisa o holerite assim que ele é enviado:\n\n"
+              "- **A IA lê:** um OCR e um LLM verificam se a imagem está legível; o LLM extrai os dados e "
+              "classifica cada linha do holerite.\n"
+              "- **O código decide:** regras determinísticas e auditáveis calculam a renda e tomam a decisão.\n"
+              "- **O cliente sabe o que fazer:** aprovado segue para um analista; reprovado recebe o motivo e como "
+              "corrigir; casos de dúvida vão direto para revisão humana.",
+        "en": "In lending, every pay stub goes through an analyst before a contract is signed. This manual review "
+              "can take hours or even days, and many documents never had a chance: an unreadable photo, the wrong "
+              "document, insufficient income. Applicants learn too late what they needed to fix, and may give up "
+              "and turn to a competitor.\n\n"
+              "This pre-screening tool reviews the pay stub as soon as it is submitted:\n\n"
+              "- **AI reads:** OCR and an LLM check whether the image is readable; the LLM extracts the data and "
+              "classifies every line on the pay stub.\n"
+              "- **Code decides:** deterministic, auditable rules compute the income and make the decision.\n"
+              "- **The applicant knows what to do:** approvals go on to an analyst; rejections come with the "
+              "reason and how to fix it; uncertain cases go straight to human review.",
+    },
+    "app_disclaimer": {
+        "pt": "Laboratório pessoal. Todos os dados e documentos são fictícios. Siga o tour ou escolha um caso abaixo.",
+        "en": "Personal lab. All data and documents are fictional. Take the tour or pick a case below.",
     },
     "page_analysis": {"pt": "Análise", "en": "Analysis"},
     "page_results": {"pt": "Resultados", "en": "Results"},

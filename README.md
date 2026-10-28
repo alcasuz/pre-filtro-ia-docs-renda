@@ -1,8 +1,16 @@
 # AI pre-screening for proof-of-income documents
 
+**Live demo:** https://pre-filtro-renda.streamlit.app/
+
 **English** · [Português](README.pt-BR.md)
 
-A pre-screening tool that reads Brazilian pay stubs (*holerites*), extracts their data with an LLM and applies credit rules in code to approve, reject or route each case to human review.
+In lending, every pay stub goes through an analyst before a contract is signed. This manual review can take hours or even days, and many documents never had a chance: an unreadable photo, the wrong document, insufficient income. Applicants learn too late what they needed to fix, and may give up and turn to a competitor.
+
+This pre-screening tool reviews the pay stub as soon as it is submitted:
+
+- **AI reads:** OCR and an LLM check whether the image is readable; the LLM extracts the data and classifies every line on the pay stub.
+- **Code decides:** deterministic, auditable rules compute the income and make the decision.
+- **The applicant knows what to do:** approvals go on to an analyst; rejections come with the reason and how to fix it; uncertain cases go straight to human review.
 
 > **Personal AI product lab.** Not a production product. All data, rules and documents are fictional. Built to practice, end to end, what an AI PM needs to master: prompting, structured output, evals, guardrails, cost and latency.
 
@@ -96,7 +104,15 @@ The eval runs at two levels:
 
 ## What I'd do differently
 
-> To be written at the end of the project.
+### Decisions I had to undo
+
+- **OCR as the only legibility check.** On phone photos, OCR confidence blocked images the LLM read correctly and let through the ones that mattered. What worked were checks on what the LLM read: valid CPF check digits, and both readers failing together.
+- **Screen photos flagged as fraud.** A photo of a monitor isn't an attack; it's a product requirement. Treating it as a recoverable rejection with a clear instruction kept the review desk for real suspicion.
+- **Net pay as income.** It looked closer to what reaches the applicant's account, but it carries every line on the stub, including temporary ones like overtime and the vacation bonus. Gross fixed pay, classified line by line, is more accurate and easier to audit.
+
+**Choosing a model is an experiment, not an assumption.** I started with the newest model, assuming it would be the best. On this task, an older Lite model matched its accuracy at about half the latency, failed far less often and had 25 times the free-tier quota. I'd benchmark candidate models from day one.
+
+**Tokens are more than input and output.** Reasoning ("thinking") tokens also consume quota and add latency. Here they changed nothing: the model that didn't reason scored the same. Newer isn't automatically better for a reading task.
 
 ## Stack
 

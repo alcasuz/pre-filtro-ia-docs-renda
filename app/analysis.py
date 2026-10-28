@@ -307,7 +307,8 @@ def render():
     all_cases = cases()
     current = selected_case(all_cases)
     st.markdown(RESPONSIVE_CSS, unsafe_allow_html=True)
-    st.caption(t("app_subtitle", lang))
+    st.markdown(t("app_intro", lang))
+    st.caption(t("app_disclaimer", lang))
 
     tour(all_cases, current, lang)
     st.divider()

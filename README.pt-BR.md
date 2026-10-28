@@ -1,8 +1,16 @@
 # Pré-filtro de comprovantes de renda com IA
 
+**Demo:** https://pre-filtro-renda.streamlit.app/
+
 [English](README.md) · **Português**
 
-Um pré-filtro que lê holerites, extrai os dados com um LLM e aplica regras de crédito em código para aprovar, reprovar ou encaminhar cada caso para revisão humana.
+Em operações de crédito, todo holerite passa por um analista antes da contratação. Essa análise manual pode levar horas ou até dias, e muitos documentos nunca teriam chance de ser aprovados: foto ilegível, documento errado, renda insuficiente. O cliente descobre tarde o que precisava corrigir e pode desistir e procurar a concorrência.
+
+Este pré-filtro analisa o holerite assim que ele é enviado:
+
+- **A IA lê:** um OCR e um LLM verificam se a imagem está legível; o LLM extrai os dados e classifica cada linha do holerite.
+- **O código decide:** regras determinísticas e auditáveis calculam a renda e tomam a decisão.
+- **O cliente sabe o que fazer:** aprovado segue para um analista; reprovado recebe o motivo e como corrigir; casos de dúvida vão direto para revisão humana.
 
 > **Laboratório pessoal de produto de IA.** Não é um produto em produção. Todos os dados, regras e documentos são fictícios. Construído para praticar, de ponta a ponta, o que um PM de IA precisa dominar: prompts, structured output, evals, guardrails, custo e latência.
 
@@ -96,7 +104,15 @@ O eval roda em dois níveis:
 
 ## O que eu faria diferente
 
-> A preencher ao fim do projeto.
+### Decisões que precisei desfazer
+
+- **O OCR como única checagem de legibilidade.** Nas fotos de celular, a confiança do OCR barrou imagens que o LLM lia corretamente e deixou passar as que importavam. O que funcionou foram checagens sobre o que o LLM leu: dígitos verificadores do CPF e os dois leitores falhando juntos.
+- **Foto de tela marcada como fraude.** Foto de monitor não é ataque; é um requisito de produto. Tratá-la como reprovação recuperável, com instrução clara, deixou a mesa de revisão para as suspeitas reais.
+- **Renda líquida.** Parecia mais próxima do que cai na conta do cliente, mas carrega todas as linhas do holerite, inclusive as temporárias, como hora extra e o 1/3 de férias. A renda bruta fixa, classificada linha a linha, é mais precisa e mais fácil de auditar.
+
+**Escolher o modelo é um experimento, não uma premissa.** Comecei com o modelo mais recente, supondo que seria o melhor. Nesta tarefa, um modelo Lite mais antigo empatou em acurácia, com cerca de metade da latência, muito menos falhas e 25 vezes mais cota gratuita. Eu compararia modelos desde o primeiro dia.
+
+**Tokens não são só entrada e saída.** Os tokens de raciocínio também consomem cota e aumentam a latência. Aqui, não mudaram nada: o modelo que não raciocinou teve o mesmo resultado. Mais novo não é automaticamente melhor para uma tarefa de leitura.
 
 ## Stack
 
