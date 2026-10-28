@@ -40,3 +40,7 @@ page = st.navigation([
 language_bar(lang)
 st.title(t("app_title", lang))
 page.run()
+
+st.divider()
+st.caption(f"{t('footer', lang)} · [GitHub](https://github.com/alcasuz/pre-filtro-ia-docs-renda) · "
+           "[LinkedIn](https://www.linkedin.com/in/suzane-lima)")

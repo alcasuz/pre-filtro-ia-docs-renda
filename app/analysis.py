@@ -2,12 +2,18 @@
 
 from decimal import Decimal
 
+import html
+
 import streamlit as st
+import streamlit.components.v1 as components
 from PIL import Image
 
 import data
 from i18n import (CLIENT_MESSAGES, DECISION, DECISION_SHORT, EXTRACTION_FIELDS, REASONS, RULES, STATUS,
-                  TOUR_TEXT, TYPE_MESSAGE_EN, TYPE_NAME_EN_DEFAULT, TYPE_NAMES_EN, label, scenario, t)
+                  TYPE_MESSAGE_EN, TYPE_NAME_EN_DEFAULT, TYPE_NAMES_EN, description, label, t, title)
+
+GITHUB_URL = "https://github.com/alcasuz/pre-filtro-ia-docs-renda"
+LINKEDIN_URL = "https://www.linkedin.com/in/suzane-lima"
 
 CARDS_PER_ROW = 4
 GALLERY_PER_ROW = 6
@@ -21,12 +27,14 @@ def cases():
 
 @st.cache_data
 def thumbnail(path):
-    """Top of the document, cropped to 4:3, so every card has the same shape."""
+    """Top of the document on a fixed 4:3 canvas, so every card has the same shape."""
     with Image.open(path) as img:
         img = img.convert("RGB")
         img = img.crop((0, 0, img.width, min(img.height, int(img.width * 0.75))))
-        img.thumbnail((THUMB_WIDTH, THUMB_WIDTH))
-        return img
+        img.thumbnail((THUMB_WIDTH, THUMB_WIDTH * 3 // 4))
+        canvas = Image.new("RGB", (THUMB_WIDTH, THUMB_WIDTH * 3 // 4), "white")
+        canvas.paste(img, ((canvas.width - img.width) // 2, 0))
+        return canvas
 
 
 def money(value, lang):
@@ -59,7 +67,7 @@ def number(value, lang, places=2):
 # ---------------------------------------------------------------------------
 
 def selected_case(all_cases):
-    requested = st.query_params.get("case")
+    requested = data.CASE_ALIASES.get(st.query_params.get("case"), st.query_params.get("case"))
     if requested in all_cases:
         st.session_state.case = requested
     case_id = st.session_state.setdefault("case", data.DEFAULT_CASE)
@@ -70,19 +78,24 @@ def selected_case(all_cases):
 def select(case_id):
     st.session_state.case = case_id
     st.query_params["case"] = case_id
+    st.session_state.scroll_to_analysis = True
 
 
-def card_title(case, lang):
-    return t("photo_case_title", lang) if case.is_demo_build else f"{case.case_id} · {case.applicant.name}"
+# Fixed heights (title: 2 lines, description: 3 lines, name: 1 line) keep every card the same size;
+# longer text ends in an ellipsis. The full description is shown in the analysis section.
+CARD_TEXT = """
+<div class="card-title">{title}</div>
+<div class="card-desc">{description}</div>
+<div class="card-name">{name}</div>
+"""
 
 
-def card(case, lang, current, key_prefix, text=None):
+def card(case, lang, current, key_prefix):
     with st.container(border=True):
         st.image(thumbnail(str(case.documents[0].image)), width="stretch")
-        st.markdown(f"**{card_title(case, lang)}**")
-        if case.is_demo_build:
-            st.caption(f"🧪 {t('demo_badge', lang)}")
-        st.caption(text or scenario(case, lang))
+        st.markdown(CARD_TEXT.format(title=html.escape(title(case, lang)),
+                                     description=html.escape(description(case, lang, card=True)),
+                                     name=html.escape(case.applicant.name)), unsafe_allow_html=True)
         chosen = case.case_id == current
         st.button(t("opened", lang) if chosen else t("open", lang), key=f"{key_prefix}_{case.case_id}",
                   type="primary" if chosen else "secondary", width="stretch", on_click=select, args=(case.case_id,))
@@ -109,18 +122,16 @@ def tour(all_cases, current, lang):
                      on_click=select, args=(data.TOUR[min(step + 1, len(data.TOUR) - 1)],))
     # Wide screens: a grid. Narrow screens: one row that scrolls sideways (CSS in RESPONSIVE_CSS).
     with st.container(key="tour_wide"):
-        grid([lambda c=c: card(all_cases[c], lang, current, "tourw", TOUR_TEXT[c][lang]) for c in data.TOUR],
-             CARDS_PER_ROW)
+        grid([lambda c=c: card(all_cases[c], lang, current, "tourw") for c in data.TOUR], CARDS_PER_ROW)
     with st.container(key="tour_narrow"):
         # The carousel starts at the open case, so it is the first card on screen.
         start = data.TOUR.index(current) if current in data.TOUR else 0
         order = data.TOUR[start:] + data.TOUR[:start]
-        grid([lambda c=c: card(all_cases[c], lang, current, "tourn", TOUR_TEXT[c][lang]) for c in order],
-             len(order))
-    applicants = [c for c in all_cases if c != data.PHOTO_CASE]
+        grid([lambda c=c: card(all_cases[c], lang, current, "tourn") for c in order], len(order))
+    applicants = [c for c in all_cases if not all_cases[c].is_demo_build]
+    built = [c for c in all_cases if all_cases[c].is_demo_build]
     with st.expander(t("all_cases", lang, n=len(applicants))):
-        grid([lambda c=c: card(all_cases[c], lang, current, "all") for c in applicants + [data.PHOTO_CASE]],
-             GALLERY_PER_ROW)
+        grid([lambda c=c: card(all_cases[c], lang, current, "all") for c in applicants + built], GALLERY_PER_ROW)
 
 
 # ---------------------------------------------------------------------------
@@ -269,16 +280,60 @@ def show_decision(case, decision, lang, stacked):
                                                     else t("no_fraud", lang)))
     st.markdown(md("\n".join(lines)))
 
-    if case.is_demo_build:
+    if case.original_documents:
         original = data.decide(case.applicant, case.original_documents, st.session_state.multiplier)
         st.markdown(f"**{t('comparison_title', lang)}**")
         left, right = st.columns(2)
-        for column, title, d in ((left, t("with_pdf", lang), original), (right, t("with_photo", lang), decision)):
+        for column, heading, d in ((left, t("with_pdf", lang), original), (right, t("with_photo", lang), decision)):
             reason = f" ({label(REASONS, d.main_reason, lang)})" if d.main_reason else ""
             icon = {"approve": "✅", "reject": "❌", "review": "🟡"}[d.decision]
             with column.container(border=True):
-                st.caption(title)
+                st.caption(heading)
                 st.markdown(f"{icon} **{label(DECISION_SHORT, d.decision, lang)}**{reason}")
+
+
+def featured_document(case, decision):
+    """Index of the document that drove the main reason; for approvals, the first pay stub."""
+    files = [d.file for d in case.documents]
+    reason = decision.main_reason
+    if reason:
+        for r in decision.results:
+            if r.reason == reason and r.file in files:
+                return files.index(r.file)
+        if reason == "type_not_accepted":
+            ignored = next(r for r in decision.results if r.rule == "document_type").details.get("ignored") or []
+            if ignored and ignored[0] in files:
+                return files.index(ignored[0])
+        if reason == "insufficient_income":
+            # The pay stub with an earnings line that doesn't count (overtime, vacation bonus...), if any.
+            for i, d in enumerate(case.documents):
+                if any(not line.counts_as_income for line in d.document.earnings_lines):
+                    return i
+    return next((i for i, d in enumerate(case.documents) if d.document.document_type.startswith("payslip")), 0)
+
+
+def call_to_action(lang):
+    with st.container(border=True):
+        st.markdown(f"**{t('cta_title', lang)}**")
+        st.caption(t("cta_text", lang))
+        left, right = st.columns(2)
+        left.link_button(t("cta_github", lang), GITHUB_URL, width="stretch")
+        right.link_button(t("cta_linkedin", lang), LINKEDIN_URL, width="stretch")
+
+
+# Scrolls the page to the analysis after a case is chosen. The component's iframe shares the app's origin,
+# so the script can reach the page; it waits until the anchor is rendered.
+SCROLL_SCRIPT = """
+<script>
+  // {nonce}
+  const go = (tries) => {{
+    const anchor = window.parent.document.querySelector('.st-key-analysis_anchor');
+    if (anchor) {{ anchor.scrollIntoView({{behavior: 'smooth', block: 'start'}}); }}
+    else if (tries < 50) {{ setTimeout(() => go(tries + 1), 100); }}
+  }};
+  setTimeout(() => go(0), 150);
+</script>
+"""
 
 
 # ---------------------------------------------------------------------------
@@ -287,6 +342,15 @@ def show_decision(case, decision, lang, stacked):
 
 RESPONSIVE_CSS = """
 <style>
+.card-title, .card-desc { display: -webkit-box; -webkit-box-orient: vertical; overflow: hidden; }
+.card-title { font-size: 1.05rem; font-weight: 700; line-height: 1.3; height: 2.6em; -webkit-line-clamp: 2;
+              margin-bottom: .35rem; }
+.card-desc { font-size: .88rem; line-height: 1.4; height: 4.2em; -webkit-line-clamp: 3; margin-bottom: .35rem; }
+.card-name { font-size: .78rem; opacity: .6; white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
+@media (min-width: 761px) {
+  .st-key-multiplier_box, .st-key-doc_picker, .st-key-result_box { max-width: 440px; }
+}
+.st-key-analysis_anchor { scroll-margin-top: 4.5rem; }  /* clears the fixed top bar after auto-scroll */
 .st-key-narrow_layout, .st-key-tour_narrow { display: none; }
 @media (max-width: 760px) {
   .st-key-wide_layout, .st-key-tour_wide { display: none; }
@@ -314,10 +378,9 @@ def render():
     st.divider()
 
     case = all_cases[current]
-    st.subheader(card_title(case, lang))
-    if case.is_demo_build:
-        st.caption(f"🧪 {t('demo_badge', lang)}")
-    st.markdown(scenario(case, lang))
+    st.container(key="analysis_anchor", height=1, border=False)
+    st.subheader(title(case, lang))
+    st.markdown(description(case, lang))
     a = case.applicant
     st.caption(md(f"{t('applicant', lang)}: {a.name} · CPF {a.cpf[:3]}.{a.cpf[3:6]}.{a.cpf[6:9]}-{a.cpf[9:]} · "
                f"{t('installment', lang)}: {money(a.installment_amount, lang)} · "
@@ -326,14 +389,18 @@ def render():
                + (f" ({case.expected_reason})" if case.expected_reason else "")))
 
     st.session_state.setdefault("multiplier", data.default_multiplier())
-    st.number_input(t("multiplier", lang), min_value=2.0, max_value=4.0, step=0.1, format="%.1f",
-                    key="multiplier", help=t("multiplier_help", lang))
+    with st.container(key="multiplier_box"):
+        st.number_input(t("multiplier", lang), min_value=2.0, max_value=4.0, step=0.1, format="%.1f",
+                        key="multiplier", help=t("multiplier_help", lang))
     decision = data.decide(case.applicant, case.documents, st.session_state.multiplier)
-    decision_banner(decision, lang)
+    with st.container(key="result_box"):
+        decision_banner(decision, lang)
 
-    options = list(range(len(case.documents)))
-    index = st.selectbox(t("document_picker", lang), options, key=f"doc_{current}",
-                         format_func=lambda i: document_label(case.documents[i], lang))
+    featured = featured_document(case, decision)
+    options = [featured] + [i for i in range(len(case.documents)) if i != featured]
+    with st.container(key="doc_picker"):
+        index = st.selectbox(t("document_picker", lang), options, key=f"doc_{current}_{featured}",
+                             format_func=lambda i: document_label(case.documents[i], lang))
     doc = case.documents[index]
 
     with st.container(key="wide_layout"):
@@ -357,3 +424,9 @@ def render():
             show_rules(decision, lang)
         with tabs[3]:
             show_decision(case, decision, lang, stacked=True)
+
+    call_to_action(lang)
+
+    if st.session_state.pop("scroll_to_analysis", False):
+        st.session_state.scroll_nonce = st.session_state.get("scroll_nonce", 0) + 1
+        components.html(SCROLL_SCRIPT.format(nonce=st.session_state.scroll_nonce), height=0)

@@ -37,13 +37,20 @@ MODEL = "gemini-3.5-flash-lite"
 EXTRACTIONS = ROOT / "cache" / PROMPT / MODEL
 PHOTO_EXTRACTIONS = ROOT / "cache" / "photos_v2" / PROMPT / MODEL
 
-# Demo-only case: A01 (the happy path) with its July pay stub sent as a photo of the screen.
-PHOTO_CASE = "A01-PHOTO"
+# Demo-only cases, built from documents already in the repository:
+# - A01-S: A01 (the happy path) with its July pay stub sent as a photo of the screen;
+# - D01: a fictional applicant who sends a credit card bill instead of pay stubs.
+PHOTO_CASE = "A01-S"
+CASE_ALIASES = {"A01-PHOTO": PHOTO_CASE}  # older shared links
 PHOTO_CASE_BASE = "A01"
 PHOTO_CASE_SOURCE = "A01_2026-07.png"
 PHOTO_CASE_PHOTO = "A01_2026-07_happy-path.jpeg"
 
-TOUR = ["A17", "N10", "N09", "N14", "N12", PHOTO_CASE, "N17"]
+BILL_CASE = "D01"
+BILL_FILE = "X_fatura_cartao_1.png"
+BILL_APPLICANT = ("Sabrina Campos Oliveira", "15498346816", "900.00", "2026-10-15")
+
+TOUR = ["A17", "N10", BILL_CASE, "N09", "N14", "N12", "N01", PHOTO_CASE]
 DEFAULT_CASE = "A17"
 
 
@@ -95,10 +102,11 @@ def load_cases():
 
     per_applicant = {}
     for row in _read(DATA / "documents.csv"):
-        if row["applicant_id"] not in applicants:
+        owner = BILL_CASE if row["file"] == BILL_FILE else row["applicant_id"]
+        if owner not in applicants and owner != BILL_CASE:
             continue  # example documents that belong to no applicant
         extraction = _extraction(EXTRACTIONS, row["file"])
-        per_applicant.setdefault(row["applicant_id"], []).append(CaseDocument(
+        per_applicant.setdefault(owner, []).append(CaseDocument(
             row["file"], IMAGES / row["file"], extraction,
             documento_da_extracao(row["file"], extraction, words.get(row["file"]))))
 
@@ -116,6 +124,11 @@ def load_cases():
     documents = [photo if d.file == PHOTO_CASE_SOURCE else d for d in base.documents]
     cases[PHOTO_CASE] = Case(PHOTO_CASE, base.applicant, documents, base.scenario, "reject", "screen_capture",
                              is_demo_build=True, original_documents=base.documents)
+
+    name, cpf, installment, analysis_date = BILL_APPLICANT
+    bill_applicant = Cliente(BILL_CASE, name, cpf, Decimal(installment), date.fromisoformat(analysis_date))
+    cases[BILL_CASE] = Case(BILL_CASE, bill_applicant, per_applicant[BILL_CASE], "Credit card bill instead of pay stubs",
+                            "reject", "type_not_accepted", is_demo_build=True)
     return cases
 
 

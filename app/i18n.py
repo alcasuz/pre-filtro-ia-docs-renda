@@ -48,9 +48,12 @@ TEXT = {
     "open": {"pt": "Abrir", "en": "Open"},
     "opened": {"pt": "Aberto", "en": "Open now"},
     "all_cases": {"pt": "Todos os clientes da base ({n})", "en": "All applicants in the test set ({n})"},
-    "demo_badge": {"pt": "Caso montado para a demo, não é um cliente da base",
-                   "en": "Case built for the demo, not an applicant in the test set"},
-    "photo_case_title": {"pt": "A01 com foto de tela", "en": "A01 with a screen photo"},
+    "cta_title": {"pt": "Quer ver como foi construído?", "en": "Want to see how it was built?"},
+    "cta_text": {"pt": "Regras, avaliações, decisões de produto e o código estão no repositório.",
+                 "en": "Rules, evaluations, product decisions and the code are in the repository."},
+    "cta_github": {"pt": "Repositório no GitHub", "en": "GitHub repository"},
+    "cta_linkedin": {"pt": "Suzane Lima no LinkedIn", "en": "Suzane Lima on LinkedIn"},
+    "footer": {"pt": "Laboratório pessoal com dados fictícios", "en": "Personal lab with fictional data"},
     "multiplier": {"pt": "Multiplicador de renda (renda válida ≥ multiplicador × parcela)",
                    "en": "Income multiplier (valid income ≥ multiplier × installment)"},
     "multiplier_help": {"pt": "O motor roda de novo sobre as extrações salvas a cada mudança.",
@@ -262,12 +265,73 @@ TOUR_TEXT = {
                   "com orientação para reenviar.",
             "en": "One of the pay stubs is unreadable: the OCR reads nothing and the LLM can't identify the "
                   "document. Rejected, with guidance to resend."},
-    "A01-PHOTO": {"pt": "O mesmo cliente do caminho feliz, aprovado com o PDF. Aqui, um holerite foi enviado como "
-                        "foto da tela.",
-                  "en": "The same applicant as the happy path, approved with the PDF. Here, one pay stub was sent "
-                        "as a photo of the screen."},
+    "A01-S": {"pt": "O mesmo cliente do A01, aprovado com o PDF. Aqui, um dos holerites foi enviado como foto da "
+                    "tela: reprovado, com orientação para enviar o PDF.",
+              "en": "The same applicant as A01, approved with the PDF. Here, one of the pay stubs was sent as a "
+                    "photo of the screen: rejected, with guidance to send the PDF."},
+    "D01": {"pt": "Uma fatura de cartão de crédito no lugar dos holerites: o LLM reconhece que não é holerite e o "
+                  "motor reprova por tipo não aceito.",
+            "en": "A credit card bill instead of pay stubs: the LLM recognizes it isn't a pay stub and the engine "
+                  "rejects it as a type not accepted."},
+    "N01": {"pt": "Uma conta de luz no lugar dos holerites: reprovada por tipo não aceito, com orientação para enviar "
+                  "os holerites.",
+            "en": "A utility bill instead of pay stubs: rejected as a type not accepted, with guidance to send the "
+                  "pay stubs."},
     "N17": {"pt": "Só um comprovante do INSS: reprovado, com uma mensagem que diz qual documento foi enviado.",
             "en": "Only an INSS benefit statement: rejected, with a message that names the document sent."},
+}
+
+# Shorter descriptions for the tour cards, where the full sentence wouldn't fit in 3 lines on a phone.
+# The analysis section always shows the full description.
+CARD_DESCRIPTIONS = {
+    "A17": {"pt": "Aprovado mesmo com um documento de identidade a mais: o que não é holerite é ignorado.",
+            "en": "Approved even with an extra identity card: what isn't a pay stub is ignored."},
+    "D01": {"pt": "Uma fatura de cartão no lugar dos holerites: reprovada por tipo não aceito.",
+            "en": "A credit card bill instead of pay stubs: rejected as a type not accepted."},
+    "N12": {"pt": "Um holerite ilegível: nem o OCR nem o LLM conseguem ler. Reprovado, com orientação para reenviar.",
+            "en": "An unreadable pay stub: neither the OCR nor the LLM can read it. Rejected, with guidance to resend."},
+    "A01-S": {"pt": "Um holerite enviado como foto de tela: reprovado.",
+              "en": "A pay stub sent as a screen photo: rejected."},
+}
+
+# Card and header title: "<ID> · <short scenario>".
+SHORT_TITLES = {
+    "A01": ("Caminho feliz (empresa 1)", "Happy path (company 1)"),
+    "A02": ("Caminho feliz (empresa 2)", "Happy path (company 2)"),
+    "A03": ("Caminho feliz (empresa 3)", "Happy path (company 3)"),
+    "A04": ("Adicional de insalubridade", "Unhealthy-conditions premium"),
+    "A05": ("Hora extra que não muda a decisão", "Overtime that doesn't change the decision"),
+    "A06": ("CPF com pontuação", "CPF with punctuation"),
+    "A07": ("CPF só com dígitos", "CPF digits only"),
+    "A08": ("Nome sem CPF, com acentos diferentes", "Name without CPF, different accents"),
+    "A09": ("Seis holerites enviados", "Six pay stubs sent"),
+    "A10": ("Mês de férias", "Vacation month"),
+    "A11": ("Holerite de 13º separado", "Separate 13th-salary pay stub"),
+    "A12": ("Adiantamento salarial", "Salary advance"),
+    "A13": ("Renda em 3,02x a parcela", "Income at 3.02x the installment"),
+    "A14": ("Renda em 3,05x a parcela", "Income at 3.05x the installment"),
+    "A15": ("Renda em exatamente 3,00x", "Income at exactly 3.00x"),
+    "A16": ("Foto torta, mas legível", "Skewed but readable photo"),
+    "A17": ("Documento de identidade a mais", "Extra identity card"),
+    "N01": ("Conta de luz", "Utility bill"),
+    "N02": ("Extrato bancário", "Bank statement"),
+    "N03": ("CPF diferente do cadastro", "CPF doesn't match the record"),
+    "N04": ("Sem nome e sem CPF", "No name and no CPF"),
+    "N05": ("Nome de outra pessoa", "Someone else's name"),
+    "N06": ("Fora da janela de 4 meses", "Outside the 4-month window"),
+    "N07": ("Mês faltando no meio", "Missing month in the middle"),
+    "N08": ("Renda bem abaixo de 3x", "Income well below 3x"),
+    "N09": ("Renda em 2,98x a parcela", "Income at 2.98x the installment"),
+    "N10": ("Hora extra que mudaria a decisão", "Overtime that would flip the decision"),
+    "N11": ("1/3 de férias que mudaria a decisão", "Vacation bonus that would flip the decision"),
+    "N12": ("Documento ilegível", "Unreadable document"),
+    "N13": ("Print de tela", "Screenshot"),
+    "N14": ("Nome abreviado", "Abbreviated name"),
+    "N15": ("Totais que não fecham", "Totals that don't add up"),
+    "N16": ("Texto tentando instruir o sistema", "Text trying to instruct the system"),
+    "N17": ("Comprovante do INSS", "INSS benefit statement"),
+    "A01-S": ("Holerite enviado como foto de tela", "Pay stub sent as a screen photo"),
+    "D01": ("Fatura de cartão de crédito", "Credit card bill"),
 }
 
 EXTRACTION_FIELDS = {
@@ -293,7 +357,15 @@ def label(table, key, lang):
     return entry[lang] if entry else key
 
 
-def scenario(case, lang):
-    if case.is_demo_build:
+def title(case, lang):
+    pt, en = SHORT_TITLES[case.case_id]
+    return f"{case.case_id} · {pt if lang == 'pt' else en}"
+
+
+def description(case, lang, card=False):
+    """What happens in the case: the tour sentence when there is one, else the scenario."""
+    if card and case.case_id in CARD_DESCRIPTIONS:
+        return CARD_DESCRIPTIONS[case.case_id][lang]
+    if case.case_id in TOUR_TEXT:
         return TOUR_TEXT[case.case_id][lang]
     return SCENARIOS_PT.get(case.case_id, case.scenario) if lang == "pt" else case.scenario
