@@ -14,7 +14,7 @@ Este pré-filtro analisa o holerite assim que ele é enviado:
 
 > **Laboratório pessoal de produto de IA.** Não é um produto em produção. Todos os dados, regras e documentos são fictícios. Construído para praticar, de ponta a ponta, o que um PM de IA precisa dominar: prompts, structured output, evals, guardrails, custo e latência.
 
-**Status:** em construção. Regras, arquitetura e base de teste (dados e imagens) prontas, e o smoke test do Gemini passou; extração e evals em andamento.
+**Status:** v1 concluída: motor de regras, evals na base sintética e em 20 fotos de celular, prompt de extração v4 e uma [demo pública](https://pre-filtro-renda.streamlit.app/). Próximo passo: validar o porteiro de legibilidade com fotos novas, separadas para teste, incluindo fotos de holerites impressos.
 
 ---
 
@@ -85,20 +85,89 @@ O eval roda em dois níveis:
 
 ## Resultados
 
-> Em construção. Os números abaixo serão preenchidos com os resultados dos evals rodados neste repositório.
+Todos os números vêm dos relatórios em [`evaluation/results/`](evaluation/results/) e dos logs da API (`_log.csv`) em `cache/`. Salvo indicação: modelo `gemini-3.5-flash-lite`, prompt de extração v4, configuração de regras v3.
 
-| Métrica | OCR + LLM | LLM lendo a imagem |
+### Decisão por cliente (34 clientes sintéticos)
+
+O oráculo alimenta o motor com o gabarito, como se o LLM lesse todos os documentos perfeitamente; ponta a ponta usa a extração do LLM salva em cache.
+
+| Métrica | Oráculo | Ponta a ponta |
 |---|---|---|
-| Acurácia por linha classificada | — | — |
-| Acurácia dos valores extraídos | — | — |
-| Acerto da decisão final | — | — |
-| Taxa de falso negativo | — | — |
-| Latência média por documento | — | — |
-| Tokens por documento | — | — |
+| Decisão certa | 34/34 (100%) | 34/34 (100%) |
+| Motivo principal certo | 34/34 (100%) | 34/34 (100%) |
+| approve | 17/17 | 17/17 |
+| reject | 14/14 | 14/14 |
+| review | 3/3 | 3/3 |
+| Falsos negativos (deveria aprovar, foi reprovado) | 0/17 | 0/17 |
+
+Nos dois modos, a renda válida bateu com o gabarito ao centavo nos 31 clientes em que dá para comparar.
+
+### Extração por documento (116 documentos avaliados, 98 deles holerites)
+
+| Métrica | Resultado |
+|---|---|
+| Campos do holerite (competência, nome, CPF, total de vencimentos, total de descontos, líquido) | 98/98 cada (100%) |
+| Linhas de provento encontradas | 132/132 |
+| Linhas classificadas certo (conta / não conta como renda) | 132/132 |
+| Valores das linhas certos | 132/132 |
+| Tipo de documento | 113/116 (97,4%) |
+| Campos inventados (preenchidos onde o gabarito é vazio) | 0 |
+| Sinalização de fraude nos holerites | 98/98 certos (1 detectada, 0 alarmes falsos, 0 não detectadas) |
+| Forma de captura nos holerites | 97/98 (99,0%) |
+
+Os 3 erros de tipo trocam um tipo não aceito por outro (os dois informes de rendimentos lidos como declaração de IR e uma fatura de cartão lida como extrato bancário). Nenhum documento que não é holerite foi lido como holerite, então nenhuma decisão muda. O documento desfocado fica fora da avaliação.
+
+### Custo e confiabilidade
+
+Mesmo prompt (v2) e mesma base para os dois modelos:
+
+| Métrica | gemini-3.5-flash-lite | gemini-3.8-flash |
+|---|---|---|
+| Documentos extraídos | 98 | 10 |
+| Acurácia dos campos nos documentos extraídos | 100% | 100% |
+| Taxa de erro da API | 1/99 (1,0%) | 11/21 (52,4%): 7 × 503, 3 tempos limite, 1 × 429 |
+| Latência p50 / p90 | 23,04 s / 55,80 s | 40,27 s / 65,64 s |
+| Tokens médios por documento | 1.999 (0 de raciocínio) | 2.325 (333 de raciocínio) |
+
+Nas fotos de celular a diferença foi maior: o Lite extraiu 9 de 9 fotos sem erros (p50 de 2,79 s), enquanto o 3.8 Flash extraiu 2 de 10, com 8 erros (p50 de 162,10 s) e 3.764 tokens de raciocínio por foto, em média.
+
+Lite em três rodadas da base, em 26/10/2026 e 27/10/2026 (prompts v2, v3 e v4):
+
+| Métrica | Faixa |
+|---|---|
+| Latência p50 | de 2,59 s a 23,04 s |
+| Latência p90 | de 6,67 s a 55,80 s |
+| Taxa de erro da API | de 0/117 (0%) a 1/99 (1,0%) |
+| Tokens médios por documento | de 1.999 a 2.279 |
+
+### Fotos de celular (20)
+
+Cada foto substitui o documento de origem no conjunto do cliente, e o motor decide de novo.
+
+| Métrica | Resultado |
+|---|---|
+| Decisão do cliente certa | 18/20 |
+| Reprovações recuperáveis de fotos legíveis (o cliente é orientado a reenviar) | 2 |
+| Decisões finais erradas | 0 |
+| Campos e linhas certos (19 fotos legíveis) | 141/155 (91,0%) |
+| Forma de captura certa | 20/20 |
+| Fotos legíveis barradas pelo porteiro de legibilidade | 2 |
+| Fotos ilegíveis que passaram | 0 |
+
+As 2 reprovações recuperáveis são fotos tremidas em que o LLM leu um CPF com dígitos verificadores inválidos. Esses resultados foram medidos nas mesmas fotos usadas para desenhar o porteiro de legibilidade, então tendem a ser otimistas; a validação com fotos novas está pendente.
+
+### Como ler esses números
+
+A base sintética está saturada: o oráculo e a rodada ponta a ponta chegam a 100%, então ela já não diferencia versões boas. Esses 100% são o teto do que a base mede, não o desempenho em documentos reais. As fotos de celular são onde as falhas aparecem (91,0% dos campos e linhas certos), e também são a menor amostra.
 
 ## Limitações conhecidas
 
-- Base pequena e sintética: os números mostram o comportamento do sistema nos cenários testados, não a performance em documentos reais.
+- Base pequena, sintética e saturada: os números mostram o comportamento do sistema nos cenários testados, não a performance em documentos reais.
+- Os resultados das fotos de celular foram medidos nas mesmas 20 fotos usadas para desenhar o porteiro de legibilidade; a validação com fotos novas, separadas para teste, está pendente.
+- Os alarmes falsos da regra de captura de tela (foto de holerite impresso classificada como foto de tela, que seria reprovada por engano) ainda não foram medidos: a base de fotos não tem fotos do papel.
+- Numa foto cortada, o LLM pode preencher um total que não aparece copiando o valor de uma linha; na base de fotos isso aconteceu uma vez e mudaria a decisão se fotos de tela fossem aceitas.
+- Alguns documentos não aceitos são confundidos entre si (3 de 116 documentos): a decisão não muda, mas a mensagem cita o tipo errado.
+- No plano gratuito, a latência varia muito de um dia para outro, com o mesmo modelo e a mesma base.
 - Férias pagas antes da competência podem inflar um mês e reduzir outro; na v1, vale a competência escrita no documento.
 - Só holerite na v1; extrato, benefício do INSS, IR e pró-labore estão mapeados em [`rules.md`](rules.md) como backlog.
 

@@ -14,7 +14,7 @@ This pre-screening tool reviews the pay stub as soon as it is submitted:
 
 > **Personal AI product lab.** Not a production product. All data, rules and documents are fictional. Built to practice, end to end, what an AI PM needs to master: prompting, structured output, evals, guardrails, cost and latency.
 
-**Status:** work in progress. Rules, architecture and the test set (data and images) are done, and the Gemini smoke test has passed; extraction and evals are under way.
+**Status:** v1 complete: rules engine, evals on the synthetic set and on 20 phone photos, extraction prompt v4 and a [public demo](https://pre-filtro-renda.streamlit.app/). Next: validate the legibility gate on new, held-out photos, including photos of printed pay stubs.
 
 ---
 
@@ -85,20 +85,89 @@ The eval runs at two levels:
 
 ## Results
 
-> In progress. The numbers below will come from the evals run in this repository.
+All numbers come from the reports in [`evaluation/results/`](evaluation/results/) and from the API logs (`_log.csv`) in `cache/`. Unless noted: model `gemini-3.5-flash-lite`, extraction prompt v4, rules configuration v3.
 
-| Metric | OCR + LLM | LLM reading the image |
+### Decision per applicant (34 synthetic applicants)
+
+The oracle feeds the engine the ground truth, as if the LLM read every document perfectly; end to end uses the LLM's cached extraction.
+
+| Metric | Oracle | End to end |
 |---|---|---|
-| Accuracy per classified line item | — | — |
-| Accuracy of extracted amounts | — | — |
-| Final decision accuracy | — | — |
-| False negative rate | — | — |
-| Average latency per document | — | — |
-| Tokens per document | — | — |
+| Right decision | 34/34 (100%) | 34/34 (100%) |
+| Right main reason | 34/34 (100%) | 34/34 (100%) |
+| approve | 17/17 | 17/17 |
+| reject | 14/14 | 14/14 |
+| review | 3/3 | 3/3 |
+| False negatives (should approve, was rejected) | 0/17 | 0/17 |
+
+In both modes, the valid income matched the ground truth to the cent in all 31 applicants where it can be compared.
+
+### Extraction per document (116 scored documents, 98 of them pay stubs)
+
+| Metric | Result |
+|---|---|
+| Pay stub fields (pay period, name, CPF, total earnings, total deductions, net pay) | 98/98 each (100%) |
+| Earnings lines found | 132/132 |
+| Earnings lines classified right (counts / doesn't count as income) | 132/132 |
+| Earnings line amounts right | 132/132 |
+| Document type | 113/116 (97.4%) |
+| Invented fields (filled where the ground truth is empty) | 0 |
+| Fraud flag on pay stubs | 98/98 right (1 detected, 0 false alarms, 0 missed) |
+| Capture type on pay stubs | 97/98 (99.0%) |
+
+The 3 document type errors swap one non-accepted type for another (the two annual income statements read as tax returns, a credit card bill read as a bank statement). No non-payslip document was read as a pay stub, so no decision changes. The blurred document is left out of the scored set.
+
+### Cost and reliability
+
+Same prompt (v2) and same test set for both models:
+
+| Metric | gemini-3.5-flash-lite | gemini-3.8-flash |
+|---|---|---|
+| Documents extracted | 98 | 10 |
+| Field accuracy on the documents extracted | 100% | 100% |
+| API error rate | 1/99 (1.0%) | 11/21 (52.4%): 7 × 503, 3 timeouts, 1 × 429 |
+| Latency p50 / p90 | 23.04 s / 55.80 s | 40.27 s / 65.64 s |
+| Average tokens per document | 1,999 (0 reasoning) | 2,325 (333 reasoning) |
+
+On phone photos the gap was wider: Lite extracted 9 of 9 photos with no errors (p50 2.79 s), while 3.8 Flash extracted 2 of 10, with 8 errors (p50 162.10 s) and 3,764 reasoning tokens per photo on average.
+
+Lite across three runs of the test set, on 2026-10-26 and 2026-10-27 (prompts v2, v3 and v4):
+
+| Metric | Range |
+|---|---|
+| Latency p50 | 2.59 s to 23.04 s |
+| Latency p90 | 6.67 s to 55.80 s |
+| API error rate | 0/117 (0%) to 1/99 (1.0%) |
+| Average tokens per document | 1,999 to 2,279 |
+
+### Phone photos (20)
+
+Each photo replaces its source document in the applicant's set, and the engine decides again.
+
+| Metric | Result |
+|---|---|
+| Right applicant decision | 18/20 |
+| Recoverable rejections of readable photos (the applicant is asked to resend) | 2 |
+| Wrong final decisions | 0 |
+| Fields and lines right (19 readable photos) | 141/155 (91.0%) |
+| Capture type right | 20/20 |
+| Readable photos blocked by the legibility gate | 2 |
+| Unreadable photos let through | 0 |
+
+The 2 recoverable rejections are blurred photos in which the LLM read a CPF with invalid check digits. These results were measured on the same photos used to design the legibility gate, so they tend to be optimistic; validation on new photos is pending.
+
+### How to read these numbers
+
+The synthetic test set is saturated: both the oracle and the end-to-end run hit 100%, so it no longer tells good versions apart. Those 100% are the ceiling of what the set measures, not the performance on real documents. The phone photos are where the gaps show (91.0% of fields and lines right), and they are also the smallest sample.
 
 ## Known limitations
 
-- Small, synthetic test set: the numbers show how the system behaves in the tested scenarios, not its performance on real documents.
+- Small, synthetic and saturated test set: the numbers show how the system behaves in the tested scenarios, not its performance on real documents.
+- The phone photo results were measured on the same 20 photos used to design the legibility gate; validation on new, held-out photos is pending.
+- False alarms of the screen capture rule (a photo of a printed pay stub classified as a photo of a screen, which would be wrongly rejected) are not measured yet: the photo set has no photos of paper.
+- On a cropped photo, the LLM can fill in a total that isn't visible by copying a line amount; in the photo set this happened once and would change the decision if screen photos were accepted.
+- Some non-accepted documents are confused with each other (3 of 116 documents): the decision doesn't change, but the message names the wrong document type.
+- Latency on the free tier varies a lot from day to day for the same model and set.
 - Vacation pay issued before the pay period can inflate one month and deflate another; in v1, the pay period printed on the document prevails.
 - Pay stubs only in v1; bank statements, social security benefits, tax returns and owner's draw are mapped in [`rules.md`](rules.md) as backlog.
 
