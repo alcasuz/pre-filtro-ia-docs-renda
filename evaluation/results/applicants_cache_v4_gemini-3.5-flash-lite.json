@@ -1,0 +1,35 @@
+{
+  "source": "cache extraction_v4 · gemini-3.5-flash-lite",
+  "applicants": 34,
+  "right_decision": [
+    34,
+    34
+  ],
+  "right_reason": [
+    34,
+    34
+  ],
+  "per_class": {
+    "approve": [
+      17,
+      17
+    ],
+    "reject": [
+      14,
+      14
+    ],
+    "review": [
+      3,
+      3
+    ]
+  },
+  "false_negatives": [
+    0,
+    17
+  ],
+  "income_different": [
+    0,
+    31
+  ],
+  "wrong_applicants": []
+}

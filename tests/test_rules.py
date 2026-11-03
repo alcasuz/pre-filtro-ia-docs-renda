@@ -113,25 +113,30 @@ def test_tipo_so_documentos_nao_aceitos_reprova():
     assert (r.status, r.reason) == (REJECT, "type_not_accepted")
 
 
-@pytest.mark.parametrize("tipo, nome", [
-    ("bank_statement", "um extrato bancário"),
-    ("tax_return", "uma declaração de imposto de renda"),
-    ("inss_benefit", "um comprovante do INSS"),
-    ("other_document", "um documento que não é holerite"),
-    ("unidentified", "um documento que não é holerite"),
-    ("other", "um documento que não é holerite"),   # prompts até o v3
+@pytest.mark.parametrize("tipo, problema", [
+    ("bank_statement", "Extrato bancário não é aceito."),
+    ("tax_return", "Declaração de imposto de renda não é aceita."),
+    ("inss_benefit", "Comprovante do INSS não é aceito."),
+    ("other_document", "Este tipo de documento não é aceito."),
+    ("unidentified", "Este tipo de documento não é aceito."),
+    ("other", "Este tipo de documento não é aceito."),   # prompts até o v3
 ])
-def test_mensagem_cita_o_tipo_enviado(tipo, nome):
+def test_mensagem_cita_o_tipo_enviado(tipo, problema):
     r = document_type.avaliar([holerite(tipo=tipo)])
-    assert r.details["message"] == (f"Você enviou {nome}. No momento aceitamos apenas holerite. "
-                                    "Envie os holerites dos últimos 3 meses.")
+    assert r.details["message"] == f"{problema} Envie os holerites dos últimos 3 meses."
 
 
 def test_mensagem_com_dois_tipos_cita_os_dois_sem_repetir():
     docs = [holerite(tipo="bank_statement", arquivo="a.png"), holerite(tipo="bank_statement", arquivo="b.png"),
             holerite(tipo="tax_return", arquivo="c.png")]
-    assert document_type.avaliar(docs).details["message"].startswith(
-        "Você enviou um extrato bancário e uma declaração de imposto de renda.")
+    assert document_type.avaliar(docs).details["message"] == (
+        "Extrato bancário e declaração de imposto de renda não são aceitos. Envie os holerites dos últimos 3 meses.")
+
+
+def test_mensagem_com_tipo_sem_nome_proprio_nao_cita_tipos():
+    docs = [holerite(tipo="bank_statement", arquivo="a.png"), holerite(tipo="other_document", arquivo="b.png")]
+    assert document_type.avaliar(docs).details["message"] == (
+        "Esses tipos de documento não são aceitos. Envie os holerites dos últimos 3 meses.")
 
 
 def test_tipo_extrato_extra_junto_com_holerites_e_ignorado():

@@ -446,6 +446,25 @@ def fmt_dec(d):
     return f"{d[0]}/{d[1]}" if d[1] else d[0]
 
 
+def dados(r):
+    """Números do resumo em JSON, lidos pelo painel de resultados do demo (app/results.py)."""
+    avaliadas = [x for x in r["resultados"] if "campos" in x]
+    por_defeito = defaultdict(lambda: {"photos": 0, "right": [0, 0]})
+    for x in avaliadas:
+        a, t = acerto(x)
+        d = por_defeito[x["foto"]["defect"]]
+        d["photos"] += 1
+        d["right"][0] += a
+        d["right"][1] += t
+    xs = [x for x in r["resultados"] if "impacto" in x]
+    decisao = {n: [sum(x["impacto"][n]["esperada"] == x["impacto"][n]["obtida"] for x in xs), len(xs)]
+               for n, _ in VISOES} if xs else {}
+    return {"prompt": r["prompt"], "model": r["modelo"], "photos": len(r["resultados"]), "readable": len(avaliadas),
+            "fields_right": [sum(acerto(x)[0] for x in avaliadas), sum(acerto(x)[1] for x in avaliadas)],
+            "by_defect": dict(por_defeito),
+            "decision": {"current_rules": decisao.get("com_captura"), "capture_accepted": decisao.get("sem_captura")}}
+
+
 def main():
     parser = argparse.ArgumentParser(description="Avalia a extração das fotos da base v2.")
     parser.add_argument("--model", required=True)
@@ -457,6 +476,8 @@ def main():
     sufixo = "" if args.prompt == "extraction_v2" else f"{args.prompt.removeprefix('extraction_')}_"
     destino = PASTA_RESULTADOS / f"photos_v2_{sufixo}{args.model}.md"
     destino.write_text(relatorio(r), encoding="utf-8")
+    destino.with_suffix(".json").write_text(json.dumps(dados(r), ensure_ascii=False, indent=2) + "\n",
+                                            encoding="utf-8")
     print("\n".join(resumo(r)))
     print(f"\nFull report: {destino.relative_to(RAIZ)}")
 
