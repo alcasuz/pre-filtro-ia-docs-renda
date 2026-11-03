@@ -1,0 +1,92 @@
+{
+  "prompt": "extraction_v4",
+  "model": "gemini-3.5-flash-lite",
+  "photos": 20,
+  "readable": 19,
+  "fields_right": [
+    141,
+    155
+  ],
+  "by_defect": {
+    "none": {
+      "photos": 3,
+      "right": [
+        19,
+        19
+      ]
+    },
+    "screen_ui_visible": {
+      "photos": 2,
+      "right": [
+        19,
+        19
+      ]
+    },
+    "small_in_frame": {
+      "photos": 1,
+      "right": [
+        9,
+        9
+      ]
+    },
+    "tilted": {
+      "photos": 1,
+      "right": [
+        9,
+        9
+      ]
+    },
+    "flash_glare": {
+      "photos": 3,
+      "right": [
+        26,
+        28
+      ]
+    },
+    "cropped": {
+      "photos": 4,
+      "right": [
+        29,
+        33
+      ]
+    },
+    "occluded": {
+      "photos": 1,
+      "right": [
+        7,
+        9
+      ]
+    },
+    "upside_down": {
+      "photos": 1,
+      "right": [
+        10,
+        10
+      ]
+    },
+    "motion_blur": {
+      "photos": 2,
+      "right": [
+        12,
+        18
+      ]
+    },
+    "rotated": {
+      "photos": 1,
+      "right": [
+        1,
+        1
+      ]
+    }
+  },
+  "decision": {
+    "current_rules": [
+      18,
+      20
+    ],
+    "capture_accepted": [
+      15,
+      20
+    ]
+  }
+}

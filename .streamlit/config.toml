@@ -1,0 +1,32 @@
+# Demo theme: a fixed light base; ink blue for actions only; green, red and orange (amber) only for status.
+# Contrast of each text color on its background is in decisions.md (2026-11-02).
+
+[theme]
+base = "light"
+primaryColor = "#1D4F91"
+backgroundColor = "#FFFFFF"
+secondaryBackgroundColor = "#F2F5F8"
+textColor = "#17222B"
+linkColor = "#1D4F91"
+borderColor = "#DDE2E6"
+font = "'IBM Plex Sans':https://fonts.googleapis.com/css2?family=IBM+Plex+Sans:wght@400;500;600;700&display=swap"
+headingFont = "'IBM Plex Sans':https://fonts.googleapis.com/css2?family=IBM+Plex+Sans:wght@400;500;600;700&display=swap"
+
+greenColor = "#17703F"
+greenTextColor = "#17703F"
+greenBackgroundColor = "#E4F3EA"
+redColor = "#B42318"
+redTextColor = "#B42318"
+redBackgroundColor = "#FBE9E7"
+orangeColor = "#8A5A00"
+orangeTextColor = "#8A5A00"
+orangeBackgroundColor = "#FDF1D8"
+yellowColor = "#8A5A00"
+yellowTextColor = "#8A5A00"
+yellowBackgroundColor = "#FDF1D8"
+blueColor = "#1D4F91"
+blueTextColor = "#1D4F91"
+blueBackgroundColor = "#E8EFF8"
+grayColor = "#5F6B74"
+grayTextColor = "#55636E"
+grayBackgroundColor = "#ECEFF1"

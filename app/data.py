@@ -146,11 +146,12 @@ def default_multiplier():
 RESULTS = ROOT / "evaluation" / "results"
 
 
-def result_reports():
-    """{group: [paths]} of the markdown reports in evaluation/results/."""
-    groups = {"applicants": [], "documents": [], "photos": [], "gates": []}
-    for path in sorted(RESULTS.glob("*.md")):
-        for prefix in groups:
-            if path.name.startswith(prefix):
-                groups[prefix].append(path)
-    return {k: v for k, v in groups.items() if v}
+def summaries():
+    """{"applicants" | "documents" | "photos": summary} for the prompt and model the demo uses.
+
+    The JSON files are written by evaluation/score_applicants.py, score_documents.py and score_photos.py next to
+    their markdown reports; a missing file is left out."""
+    version = PROMPT.removeprefix("extraction_")
+    files = {"applicants": f"applicants_cache_{version}_{MODEL}.json", "documents": f"documents_{version}_{MODEL}.json",
+             "photos": f"photos_v2_{version}_{MODEL}.json"}
+    return {k: json.loads((RESULTS / f).read_text(encoding="utf-8")) for k, f in files.items() if (RESULTS / f).exists()}

@@ -406,6 +406,27 @@ def relatorio_md(r):
     return "\n".join(md)
 
 
+def dados(r):
+    """Números do resumo em JSON, lidos pelo painel de resultados do demo (app/results.py)."""
+    a, l, f = r["api"], r["linhas"], r["fraude"]
+    campos = {campo: [r["acertos"][campo], r["avaliados"] if campo == "document_type" else r["holerites"]]
+              for campo in ["document_type"] + CAMPOS_TEXTO + CAMPOS_VALOR}
+    captura = [sum(n for (e, o), n in r["captura"].items() if e == o), sum(r["captura"].values())] \
+        if r["captura"] else None
+    return {"prompt": r["versao"], "model": r["modelo"], "documents": r["total_docs"], "scored": r["avaliados"],
+            "pay_stubs": r["holerites"], "fields": campos,
+            "earnings_lines": {"found": [l["casadas"], l["total_gab"]],
+                               "counts_as_income_right": [l["conta_ok"], l["casadas"]],
+                               "amount_right": [l["valor_ok"], l["casadas"]],
+                               "skipped": len(l["puladas"]), "invented": len(l["inventadas"])},
+            "invented_fields": sum(len(v) for v in r["inventados"].values()),
+            "fraud": {"right": [f["acertos"], f["total"]], "detected": len(f["detectadas"]),
+                      "false_alarms": len(f["alarmes_falsos"]), "missed": len(f["nao_detectadas"])},
+            "capture_type_right": captura,
+            "api": {"calls": a["chamadas"], "errors": a["chamadas"] - a["status"]["ok"],
+                    "latency_p50_s": a["p50"], "latency_p90_s": a["p90"], "tokens": a["tokens"]}}
+
+
 def main():
     parser = argparse.ArgumentParser(description="Avalia as extrações em cache contra o gabarito.")
     parser.add_argument("--prompt", default="extraction_v2", help="versão do prompt, ex.: extraction_v2")
@@ -417,6 +438,8 @@ def main():
     sufixo = args.prompt.removeprefix("extraction_")
     destino = PASTA_RESULTADOS / f"documents_{sufixo}_{args.model}.md"
     destino.write_text(relatorio_md(r), encoding="utf-8")
+    destino.with_suffix(".json").write_text(json.dumps(dados(r), ensure_ascii=False, indent=2, default=str) + "\n",
+                                            encoding="utf-8")
     print("\n".join(linhas_resumo(r)))
     print(f"\nFull report: {destino.relative_to(RAIZ)}")
 

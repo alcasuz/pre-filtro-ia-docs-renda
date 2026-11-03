@@ -38,8 +38,7 @@ page = st.navigation([
     st.Page(results.render, title=t("page_results", lang), url_path="results"),
 ], position="top")
 language_bar(lang)
-st.title(t("app_title", lang))
-page.run()
+page.run()  # each page draws its own title: the analysis page in its hero, the results page with st.title
 
 st.divider()
 st.caption(f"{t('footer', lang)} · [GitHub](https://github.com/alcasuz/pre-filtro-ia-docs-renda) · "

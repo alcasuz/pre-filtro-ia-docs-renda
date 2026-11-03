@@ -1,0 +1,79 @@
+{
+  "prompt": "extraction_v4",
+  "model": "gemini-3.5-flash-lite",
+  "documents": 117,
+  "scored": 116,
+  "pay_stubs": 98,
+  "fields": {
+    "document_type": [
+      113,
+      116
+    ],
+    "pay_period": [
+      98,
+      98
+    ],
+    "name_on_doc": [
+      98,
+      98
+    ],
+    "cpf_on_doc": [
+      98,
+      98
+    ],
+    "total_earnings": [
+      98,
+      98
+    ],
+    "total_deductions": [
+      98,
+      98
+    ],
+    "net_pay": [
+      98,
+      98
+    ]
+  },
+  "earnings_lines": {
+    "found": [
+      132,
+      132
+    ],
+    "counts_as_income_right": [
+      132,
+      132
+    ],
+    "amount_right": [
+      132,
+      132
+    ],
+    "skipped": 0,
+    "invented": 0
+  },
+  "invented_fields": 0,
+  "fraud": {
+    "right": [
+      98,
+      98
+    ],
+    "detected": 1,
+    "false_alarms": 0,
+    "missed": 0
+  },
+  "capture_type_right": [
+    97,
+    98
+  ],
+  "api": {
+    "calls": 117,
+    "errors": 0,
+    "latency_p50_s": 2.586,
+    "latency_p90_s": 6.666,
+    "tokens": {
+      "input_tokens": 2067.8888888888887,
+      "output_tokens": 210.73504273504273,
+      "thought_tokens": 0.0,
+      "total_tokens": 2278.6239316239316
+    }
+  }
+}

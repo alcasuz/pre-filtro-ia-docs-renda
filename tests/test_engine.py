@@ -242,7 +242,7 @@ def test_conta_de_luz_girada_que_o_ocr_nao_le_reprova_por_tipo_e_nao_por_ilegive
     r = decidir(cliente(), [documento_vazio(tipo="other_document", arquivo="T01_conta_girada.png")], CONFIG)
     assert (r.decision, r.main_reason) == (REJECT, "type_not_accepted")
     tipo = next(x for x in r.results if x.rule == "document_type")
-    assert tipo.details["message"].startswith("Você enviou um documento que não é holerite.")
+    assert tipo.details["message"].startswith("Este tipo de documento não é aceito.")
 
 
 def test_imagem_nao_identificada_sem_ocr_e_ilegivel_e_nao_tipo():

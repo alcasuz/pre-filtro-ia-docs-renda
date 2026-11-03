@@ -222,6 +222,16 @@ def relatorio(r, m):
     return "\n".join(md) + "\n"
 
 
+def dados(r, m):
+    """Números do resumo em JSON, lidos pelo painel de resultados do demo (app/results.py)."""
+    return {"source": titulo(r), "applicants": m["total"],
+            "right_decision": [m["decisao_ok"], m["total"]], "right_reason": [m["motivo_ok"], m["total"]],
+            "per_class": {c: list(m["por_classe"][c]) for c in CLASSES},
+            "false_negatives": [len(m["falsos_negativos"]), m["aprovaveis"]],
+            "income_different": [len(m["renda_diferente"]), len(m["comparaveis"])],
+            "wrong_applicants": [l["cliente"] for l in m["errados"]]}
+
+
 def main():
     parser = argparse.ArgumentParser(description="Eval por cliente do motor de regras.")
     parser.add_argument("--source", choices=["oracle", "cache"], required=True)
@@ -238,6 +248,8 @@ def main():
         f"applicants_cache_{args.prompt.removeprefix('extraction_')}_{args.model}.md"
     destino = PASTA_RESULTADOS / nome
     destino.write_text(relatorio(r, m), encoding="utf-8")
+    destino.with_suffix(".json").write_text(json.dumps(dados(r, m), ensure_ascii=False, indent=2) + "\n",
+                                            encoding="utf-8")
     print("\n".join(resumo(r, m)))
     print(f"\nFull report: {destino.relative_to(RAIZ)}")
 
